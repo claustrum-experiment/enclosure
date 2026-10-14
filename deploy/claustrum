@@ -13,7 +13,7 @@
 #   claustrum https [--cloudflare] D1 D2..   serve the site over HTTPS at these domains
 set -euo pipefail
 APP=/opt/claustrum/app; KEYS=/opt/claustrum/keys; ADMIN=/root/claustrum-admin
-REPO=git@github.com:claustrum-experiment/enclosure.git
+REPO=https://github.com/claustrum-experiment/enclosure.git
 SOLANA=/opt/solana/bin
 envval() { grep -E "^$1=" $KEYS/.env | head -1 | cut -d= -f2-; }
 pub() { $SOLANA/solana-keygen pubkey "$1"; }
@@ -71,8 +71,7 @@ install)
   echo "Status page: http://$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)/status.json"
   ;;
 update)
-  # Code updates from GitHub (keys never travel this way; they are already on the server).
-  # One-time setup: claustrum github-key, add the printed key to the repo as a read-only deploy key.
+  # Code updates from the public GitHub repository (keys never travel this way; they are already on the server).
   exec 9>/var/lock/claustrum-install; flock -n 9 || { echo "another install is already running"; exit 1; }
   SRC=/opt/claustrum/src; NEW=/opt/claustrum/app.new
   if [ -d $SRC/.git ]; then git -C $SRC fetch -q origin main && git -C $SRC reset -q --hard origin/main
