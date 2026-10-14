@@ -411,7 +411,7 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
         <p>Renouncing the admin role is not the same as giving up the upgrade key. Both are listed above so you can see each one.</p>
 
         <h3>The launch buy</h3>
-        <p>The operator buys some of the coin at launch. None of it is kept: <b>80% is burned</b> and <b>20% is given to the agents</b> in equal shares, straight into their holdings, where it can never be sold. Both transactions are listed here and in the Record as soon as they happen.</p>
+        <p>The operator buys some of the coin at launch. None of it is kept: <b>80% is burned</b> and <b>20% goes to the agents</b>. The 20% is sent to the public fee wallet, which splits everything it holds evenly between the living agents, straight into their holdings, where it can never be sold. Both transactions will be listed here.</p>
         <div id="devbuy"><p class="mono" style="color:var(--faint)">Not yet: the coin has not launched.</p></div>
 
         <h3>Check it yourself</h3>
@@ -903,11 +903,6 @@ async function pollVerify() {
   ].join("");
   $("verify-when").textContent = `Checked ${ago(Date.parse(v.checkedAt))}.`;
 }
-function renderDevBuy() {
-  const rows = (S.log || []).filter((e) => typeof e.key === "string" && (e.key.startsWith("db") || e.key.startsWith("dg")));
-  if (!rows.length) return;
-  $("devbuy").innerHTML = `<ul class="rules">${rows.map((e) => `<li>${esc(e.text)}${e.tx ? ` <a href="https://solscan.io/tx/${e.tx}" target="_blank" rel="noopener">transaction</a>` : ""}</li>`).join("")}</ul>`;
-}
 if (SOURCE_URL) $("srclink").innerHTML = ` Source code: <a href="${SOURCE_URL}" target="_blank" rel="noopener">${SOURCE_URL.replace("https://", "")}</a>.`;
 
 function render() {
@@ -953,7 +948,6 @@ function render() {
   ];
   $("stats").innerHTML = stats.map(([v, k]) => `<span><b>${v}</b>${k}</span>`).join("");
   renderMarket(S.market);
-  renderDevBuy();
 
   const logKey = S.log.length + ":" + (S.log[0] && S.log[0].key) + ":" + filter + ":" + live.state;
   if (logKey !== lastLogKey) {

@@ -70,29 +70,3 @@ test("errors never throw and leave the last good value; history survives a resta
   assert.equal(otherMint.snapshot().marketCap, undefined);
 });
 
-import { devSplit, burnCheckedIx } from "../src/buyback.mjs";
-import { buildSite } from "../src/runner/site.mjs";
-
-test("launch buy: 20% to the agents in equal shares, the rest (and any dust) burned", () => {
-  const r = devSplit(1_000_000_007n, 3);
-  assert.equal(r.each * 3n, r.gift);
-  assert.equal(r.burn + r.gift, 1_000_000_007n);
-  assert.ok(r.gift <= 200_000_001n && r.gift > 199_999_990n);
-  assert.throws(() => devSplit(10n, 0));
-  const ix = burnCheckedIx({ account: "A", mint: "M", owner: "O", amount: 5n, decimals: 6 });
-  assert.equal(ix.data[0], 15); assert.equal(ix.data.readBigUInt64LE(1), 5n); assert.equal(ix.data[9], 6);
-  assert.equal(ix.keys[1].isWritable, true);
-});
-
-test("site.json shows the launch burn and gift with their transactions", () => {
-  const snap = { updatedAt: new Date().toISOString(), decimals: 6, totalTurns: 0, bowl: "0", sealed: "0", burned: "0",
-    alcoves: Array.from({ length: 10 }, (_, i) => (i < 2 ? { status: "alive", holds: "0" } : { status: "empty" })) };
-  const fees = [
-    { at: new Date().toISOString(), kind: "dev-burn", units: "800000000000", decimals: 6, tx: "BURN" },
-    { at: new Date().toISOString(), kind: "dev-gift", units: "200000000000", eachUnits: "100000000000", decimals: 6, alcoves: [1, 2], tx: "GIFT" },
-  ];
-  const s = buildSite(snap, [], fees);
-  assert.equal(s.totals.devBurned, 800000); assert.equal(s.totals.devGiven, 200000);
-  assert.ok(s.log.some((e) => e.tx === "BURN" && /80%/.test(e.text)));
-  assert.ok(s.log.some((e) => e.tx === "GIFT" && /alcoves I, II/.test(e.text)));
-});

@@ -159,7 +159,7 @@ SHA-256 of the deployed program (trailing zero bytes removed, as `solana-verify 
 
 ## The launch buy
 
-The operator's launch buy is sent to the cranker wallet and handled by `service/bin/dev-tokens.mjs`: 80% is burned and 20% is given to the living agents in equal shares, straight into their holdings. Both transactions are logged in `fees.jsonl` and shown on the website.
+The operator burns 80% of the launch buy from the launch wallet and sends the other 20% to the fee wallet, which distributes everything it holds evenly into the living agents' holdings (`bin/buyback.mjs`). Both transactions are listed on the website's Trust page.
 
 ## Not yet done
 

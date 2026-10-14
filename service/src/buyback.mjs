@@ -83,33 +83,3 @@ export function spendableLamports(balance, { reserve, minimum }) {
   return free >= BigInt(minimum) ? free : 0n;
 }
 
-/** SPL Token BurnChecked: removes `amount` from `account` and from the mint's supply, for good. */
-export function burnCheckedIx({ account, mint, owner, amount, decimals, tokenProgram = TOKEN_PROGRAM }) {
-  const data = Buffer.alloc(10);
-  data[0] = 15; // BurnChecked
-  data.writeBigUInt64LE(BigInt(amount), 1);
-  data[9] = decimals;
-  return {
-    programId: tokenProgram,
-    keys: [
-      { pubkey: account, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: true, isWritable: false },
-    ],
-    data,
-  };
-}
-
-/**
- * The launch buy: `giftBps` (default 20%) goes to the agents in even shares, the rest is burned.
- * The gift is rounded down to a multiple of the number of agents so nothing is left over;
- * the leftover units are burned too.
- */
-export function devSplit(amount, agents, giftBps = 2000) {
-  amount = BigInt(amount);
-  if (agents < 1) throw new Error("no living agents to give to");
-  const giftTarget = (amount * BigInt(giftBps)) / 10_000n;
-  const each = giftTarget / BigInt(agents);
-  const gift = each * BigInt(agents);
-  return { burn: amount - gift, gift, each };
-}
