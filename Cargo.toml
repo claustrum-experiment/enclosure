@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["crates/router-core"]
+# The on-chain program is built separately with `anchor build` / `cargo build-sbf`
+# (see README); it is excluded here so `cargo test` runs on any machine.
+exclude = ["programs/claustrum-router"]
+
+[profile.release]
+overflow-checks = true

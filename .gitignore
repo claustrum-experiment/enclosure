@@ -1,0 +1,15 @@
+**/target/
+*.db
+*.db-*
+*.keypair.json
+*.so
+.env
+.env.*
+admin/
+keys/
+node_modules/
+private*/
+public/
+service/config.signed.json
+target/
+test-ledger/

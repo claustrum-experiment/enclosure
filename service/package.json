@@ -1,0 +1,24 @@
+{
+  "name": "claustrum-router-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Claims CLAUSTRUM fees, routes them through the Router, and publishes delivery accounting.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "test": "node --test --no-warnings \"test/*.test.mjs\"",
+    "verify": "node --no-warnings bin/verify.mjs",
+    "test:svm": "node test/integration/svm.mjs",
+    "buyback": "node --no-warnings bin/buyback.mjs",
+    "agents": "node --no-warnings bin/agents.mjs"
+  },
+  "devDependencies": {
+    "@solana/spl-token": "0.4.9",
+    "litesvm": "^1.6.0"
+  },
+  "dependencies": {
+    "@solana/web3.js": "1.98.4"
+  }
+}

@@ -1,0 +1,90 @@
+#cloud-config
+# CLAUSTRUM server. Contains no secrets: keys arrive later through `claustrum install`.
+package_update: true
+packages: [curl, ca-certificates, ufw, bzip2]
+users:
+  - default
+  - name: claustrum
+    system: true
+    shell: /usr/sbin/nologin
+    home: /opt/claustrum
+write_files:
+  - path: /etc/systemd/system/claustrum-web.service
+    content: |
+      [Unit]
+      Description=CLAUSTRUM public files (port 80)
+      After=network-online.target
+      [Service]
+      User=claustrum
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      Environment=PUBLIC_DIR=/opt/claustrum/public
+      ExecStart=/usr/bin/node /opt/claustrum/app/deploy/web.mjs
+      Restart=always
+      RestartSec=5
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/claustrum-agents.service
+    content: |
+      [Unit]
+      Description=CLAUSTRUM residents
+      After=network-online.target
+      [Service]
+      User=claustrum
+      WorkingDirectory=/opt/claustrum
+      EnvironmentFile=/opt/claustrum/keys/.env
+      Environment=OUT_DIR=/opt/claustrum/public PRIVATE_DIR=/opt/claustrum/private AGENT_KEYS_DIR=/opt/claustrum/keys CRANKER_KEYPAIR=/opt/claustrum/keys/cranker.json
+      ExecStart=/usr/bin/node /opt/claustrum/app/service/bin/agents.mjs
+      Restart=always
+      RestartSec=20
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/claustrum-buyback.service
+    content: |
+      [Unit]
+      Description=CLAUSTRUM fee wallet: claim, buy back, distribute
+      After=network-online.target
+      [Service]
+      User=claustrum
+      WorkingDirectory=/opt/claustrum
+      EnvironmentFile=/opt/claustrum/keys/.env
+      Environment=OUT_DIR=/opt/claustrum/public EXECUTOR_KEYPAIR=/opt/claustrum/keys/buyback-executor.json
+      ExecStart=/bin/bash -c 'exec /usr/bin/node /opt/claustrum/app/service/bin/buyback.mjs --program "$PROGRAM_ID" --mint "$CLAUSTRUM_MINT" --send --loop 10'
+      Restart=always
+      RestartSec=60
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/claustrum-status.service
+    content: |
+      [Unit]
+      Description=CLAUSTRUM status snapshot
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/bash -c '/usr/local/bin/claustrum status > /opt/claustrum/public/status.txt.tmp 2>&1; mv /opt/claustrum/public/status.txt.tmp /opt/claustrum/public/status.txt; chmod 644 /opt/claustrum/public/status.txt'
+  - path: /etc/systemd/system/claustrum-status.timer
+    content: |
+      [Unit]
+      Description=CLAUSTRUM status every minute
+      [Timer]
+      OnBootSec=60
+      OnUnitActiveSec=60
+      [Install]
+      WantedBy=timers.target
+  - path: /usr/local/bin/claustrum
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # placeholder until the first upload: only `install` works
+      set -euo pipefail
+      [ "${1:-}" = install ] || { echo "upload first: tar -cf - -C upload . | ssh root@<ip> claustrum install"; exit 1; }
+      rm -rf /tmp/claustrum-inbox && install -d -m 700 /tmp/claustrum-inbox && tar -xf - -C /tmp/claustrum-inbox
+      mkdir -p /opt/claustrum/app && tar -xzf /tmp/claustrum-inbox/app.tgz -C /opt/claustrum/app
+      (cd /tmp/claustrum-inbox && tar -cf - .) | bash /opt/claustrum/app/deploy/claustrum install
+      rm -rf /tmp/claustrum-inbox
+runcmd:
+  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  - apt-get install -y nodejs
+  - mkdir -p /opt/solana && curl -fsSL https://github.com/anza-xyz/agave/releases/download/v4.3.0/solana-release-x86_64-unknown-linux-gnu.tar.bz2 | tar -xj -C /opt/solana --strip-components=1
+  - install -d -o claustrum -g claustrum -m 755 /opt/claustrum /opt/claustrum/public
+  - echo '<!doctype html><title>CLAUSTRUM</title><p>CLAUSTRUM server is up. Waiting for the first upload.' > /opt/claustrum/public/index.html
+  - ufw allow 22/tcp && ufw allow 80/tcp && ufw --force enable
+  - touch /opt/claustrum/CLOUD_INIT_DONE

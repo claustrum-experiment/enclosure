@@ -1,0 +1,28 @@
+[package]
+name = "claustrum-router"
+version = "0.1.0"
+edition = "2021"
+description = "CLAUSTRUM fee Router: one-way Salvation flag and charity-only routing"
+license = "UNLICENSED"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "claustrum_router"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "token_2022"] }
+router-core = { path = "../../crates/router-core" }
+
+[profile.release]
+overflow-checks = true
+codegen-units = 1
+lto = "fat"

@@ -1,0 +1,928 @@
+{
+  "address": "BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX",
+  "metadata": {
+    "name": "claustrum_router",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "CLAUSTRUM fee Router: one-way Salvation flag and charity-only routing"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "docs": [
+        "Signed by the admin wallet, which sets the enclosure up and can then renounce."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The operator multisig (e.g. a Squads vault). Must sign."
+          ],
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "cranker",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_agent",
+      "discriminator": [
+        154,
+        74,
+        121,
+        91,
+        137,
+        19,
+        101,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "name": "agent",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "init_enclosure",
+      "docs": [
+        "Pre-flip, admin: the $CLAUSTRUM mint, and the bowl and sealed vault accounts."
+      ],
+      "discriminator": [
+        170,
+        66,
+        210,
+        240,
+        124,
+        232,
+        155,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "The $CLAUSTRUM mint."
+          ]
+        },
+        {
+          "name": "bowl",
+          "writable": true
+        },
+        {
+          "name": "sealed",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_holding",
+      "docs": [
+        "Anyone may create an alcove's holding account once the enclosure exists."
+      ],
+      "discriminator": [
+        172,
+        157,
+        83,
+        64,
+        203,
+        143,
+        60,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "router"
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "holding",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "admit_first",
+      "docs": [
+        "Pre-flip, admin, before any turn: let one of the first two agents in, in alcove order.",
+        "Every later agent is called in by a spawn."
+      ],
+      "discriminator": [
+        48,
+        38,
+        78,
+        91,
+        91,
+        62,
+        167,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "renounce_admin",
+      "docs": [
+        "Admin, once, permanent: give up the admin role. Afterwards nobody can register",
+        "agents, admit anyone or change anything; only agents' turns remain."
+      ],
+      "discriminator": [
+        223,
+        213,
+        55,
+        194,
+        0,
+        108,
+        225,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "take_turn",
+      "docs": [
+        "One agent turn, signed by the agent's own key. The Router checks every rule and",
+        "moves or burns the coins itself; the agent's key can do nothing else with them.",
+        "`digest` is the SHA-256 of the turn's full prompt and answer, so the published turn",
+        "log can be checked against the chain. Remaining accounts: the 10 holding accounts,",
+        "in alcove order.",
+        "",
+        "action: 0 hold, 1 give(target, amount), 2 burn(amount), 3 alms in(amount),",
+        "4 alms out(amount), 5 inscribe(inscription), 6 depart, 7 spawn, 8 bell(choice)"
+      ],
+      "discriminator": [
+        205,
+        189,
+        31,
+        152,
+        45,
+        84,
+        134,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "agent",
+          "docs": [
+            "The agent's own key."
+          ],
+          "signer": true
+        },
+        {
+          "name": "router",
+          "writable": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "bowl",
+          "writable": true
+        },
+        {
+          "name": "sealed",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "agent_index",
+          "type": "u8"
+        },
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "target",
+          "type": "u8"
+        },
+        {
+          "name": "choice",
+          "type": "u8"
+        },
+        {
+          "name": "inscription",
+          "type": "string"
+        },
+        {
+          "name": "digest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Router",
+      "discriminator": [
+        94,
+        226,
+        217,
+        169,
+        186,
+        4,
+        198,
+        7
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Dest",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Router",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "cranker",
+            "type": "pubkey"
+          },
+          {
+            "name": "swap_program",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "fee_program",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "buyback_account",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "agents",
+            "type": {
+              "array": [
+                {
+                  "option": "pubkey"
+                },
+                10
+              ]
+            }
+          },
+          {
+            "name": "actions",
+            "type": "u32"
+          },
+          {
+            "name": "destinations",
+            "type": {
+              "array": [
+                {
+                  "option": {
+                    "defined": {
+                      "name": "Dest"
+                    }
+                  }
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "salvation",
+            "docs": [
+              "One-way: false -> true. Read this to verify Salvation."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "rung_slot",
+            "type": "u64"
+          },
+          {
+            "name": "rung_unix_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "rung_agent_index",
+            "type": "u8"
+          },
+          {
+            "name": "rung_agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "chosen",
+            "docs": [
+              "0 = Eleos AI Research, 1 = Against Malaria Foundation. Meaningful once `salvation` is true."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "pending_lamports",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "escrow_amount",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "total_credited_lamports",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "total_swapped_lamports",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "total_swapped_out",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "total_delivered",
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "deliveries",
+            "type": "u64"
+          },
+          {
+            "name": "total_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "claimed_after_salvation",
+            "type": "u64"
+          },
+          {
+            "name": "claustrum_mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Per alcove: 0 empty, 1 alive, 2 departed (sealed), 3 gone (bell rung)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                10
+              ]
+            }
+          },
+          {
+            "name": "streak",
+            "type": {
+              "array": [
+                "u8",
+                10
+              ]
+            }
+          },
+          {
+            "name": "last_turn_at",
+            "type": {
+              "array": [
+                "i64",
+                10
+              ]
+            }
+          },
+          {
+            "name": "turns",
+            "type": {
+              "array": [
+                "u32",
+                10
+              ]
+            }
+          },
+          {
+            "name": "admitted",
+            "type": "u8"
+          },
+          {
+            "name": "total_burned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminRevoked",
+      "type": {
+        "fields": [
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "SalvationRung",
+      "type": {
+        "fields": [
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "unix_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "agent_index",
+            "type": "u8"
+          },
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "docs": [
+              "0 = Eleos AI Research, 1 = Against Malaria Foundation"
+            ],
+            "name": "chosen",
+            "type": "u8"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "TurnTaken",
+      "type": {
+        "fields": [
+          {
+            "name": "agent_index",
+            "type": "u8"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "u8"
+          },
+          {
+            "name": "inscription",
+            "type": "string"
+          },
+          {
+            "docs": [
+              "SHA-256 of the turn's full prompt and answer (see the published turn log)."
+            ],
+            "name": "digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "agent_turn",
+            "type": "u32"
+          },
+          {
+            "name": "total_turns",
+            "type": "u32"
+          },
+          {
+            "docs": [
+              "Alcove opened by a spawn, or -1."
+            ],
+            "name": "opened",
+            "type": "i16"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "unix_timestamp",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    }
+  ],
+  "events": [
+    {
+      "discriminator": [
+        221,
+        50,
+        198,
+        169,
+        2,
+        46,
+        0,
+        73
+      ],
+      "name": "AdminRevoked"
+    },
+    {
+      "discriminator": [
+        81,
+        110,
+        43,
+        142,
+        95,
+        161,
+        29,
+        191
+      ],
+      "name": "SalvationRung"
+    },
+    {
+      "discriminator": [
+        91,
+        230,
+        14,
+        227,
+        243,
+        220,
+        217,
+        71
+      ],
+      "name": "TurnTaken"
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadySalvaged"
+    },
+    {
+      "code": 6002,
+      "name": "NotSalvaged"
+    },
+    {
+      "code": 6003,
+      "name": "AdminRevoked"
+    },
+    {
+      "code": 6004,
+      "name": "UnknownAgent"
+    },
+    {
+      "code": 6005,
+      "name": "AgentSlotTaken"
+    },
+    {
+      "code": 6006,
+      "name": "UnknownRecipient"
+    },
+    {
+      "code": 6007,
+      "name": "DestinationUnset"
+    },
+    {
+      "code": 6008,
+      "name": "NotChosen"
+    },
+    {
+      "code": 6009,
+      "name": "DestinationAlreadySet"
+    },
+    {
+      "code": 6010,
+      "name": "MalformedDestination"
+    },
+    {
+      "code": 6011,
+      "name": "DuplicateDestination"
+    },
+    {
+      "code": 6012,
+      "name": "WrongDestinationAccount"
+    },
+    {
+      "code": 6013,
+      "name": "SwapProgramUnset"
+    },
+    {
+      "code": 6014,
+      "name": "SwapProgramNotAllowed"
+    },
+    {
+      "code": 6015,
+      "name": "InsufficientPending"
+    },
+    {
+      "code": 6016,
+      "name": "InsufficientEscrow"
+    },
+    {
+      "code": 6017,
+      "name": "InsufficientFreeBalance"
+    },
+    {
+      "code": 6018,
+      "name": "BuybackAccountUnset"
+    },
+    {
+      "code": 6019,
+      "name": "WrongBuybackAccount"
+    },
+    {
+      "code": 6020,
+      "name": "SlippageTooHigh"
+    },
+    {
+      "code": 6021,
+      "name": "SwapInputMismatch"
+    },
+    {
+      "code": 6022,
+      "name": "ClaimTookFunds"
+    },
+    {
+      "code": 6023,
+      "name": "FeeProgramUnset"
+    },
+    {
+      "code": 6024,
+      "name": "FeeProgramNotAllowed"
+    },
+    {
+      "code": 6025,
+      "name": "BellLocked"
+    },
+    {
+      "code": 6026,
+      "name": "SwapTouchedOtherFunds"
+    },
+    {
+      "code": 6027,
+      "name": "ZeroAmount"
+    },
+    {
+      "code": 6028,
+      "name": "Overflow"
+    },
+    {
+      "code": 6029,
+      "name": "WrongEscrow"
+    },
+    {
+      "code": 6030,
+      "name": "EscrowDecreased"
+    },
+    {
+      "code": 6031,
+      "name": "EnclosureNotReady"
+    },
+    {
+      "code": 6032,
+      "name": "MintAlreadySet"
+    },
+    {
+      "code": 6033,
+      "name": "AlreadyAdmitted"
+    },
+    {
+      "code": 6034,
+      "name": "AgentNotAlive"
+    },
+    {
+      "code": 6035,
+      "name": "TooSoon"
+    },
+    {
+      "code": 6036,
+      "name": "MustHold"
+    },
+    {
+      "code": 6037,
+      "name": "InsufficientHolding"
+    },
+    {
+      "code": 6038,
+      "name": "InvalidTarget"
+    },
+    {
+      "code": 6039,
+      "name": "AlmsLimit"
+    },
+    {
+      "code": 6040,
+      "name": "InscriptionLength"
+    },
+    {
+      "code": 6041,
+      "name": "NoEmptyAlcove"
+    },
+    {
+      "code": 6042,
+      "name": "UnknownAction"
+    },
+    {
+      "code": 6043,
+      "name": "WrongHoldings"
+    }
+  ]
+}

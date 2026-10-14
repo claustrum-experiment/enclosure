@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# CLAUSTRUM server helper. Run as root.
+#   claustrum install         read the upload (a tar on stdin) and set everything up
+#   claustrum status          services and recent logs
+#   claustrum sim [turns]     run the AI dry run (no chain), results in /sim-turns.jsonl
+#   claustrum deploy          deploy the program (admin wallet pays ~2.1 SOL rent + fees)
+#   claustrum setup [mint]    register agents; with the mint: enclosure, holdings, admit alcove I
+#   claustrum renounce MINT   give up the admin role for good (after setup is verified)
+#   claustrum start | stop    the agents and the buyback loop
+#   claustrum shred-admin     delete the admin and program keys from this server
+#   claustrum https [--cloudflare] D1 D2..   serve the site over HTTPS at these domains
+set -euo pipefail
+APP=/opt/claustrum/app; KEYS=/opt/claustrum/keys; ADMIN=/root/claustrum-admin
+SOLANA=/opt/solana/bin
+envval() { grep -E "^$1=" $KEYS/.env | head -1 | cut -d= -f2-; }
+pub() { $SOLANA/solana-keygen pubkey "$1"; }
+as_app() { sudo -u claustrum --preserve-env=PATH bash -c "cd /opt/claustrum && set -a && . $KEYS/.env && set +a && $*"; }
+
+case "${1:-}" in
+install)
+  exec 9>/var/lock/claustrum-install; flock -n 9 || { echo "another install is already running"; exit 1; }
+  rm -rf /opt/claustrum/inbox && install -d -m 700 /opt/claustrum/inbox && tar -xf - -C /opt/claustrum/inbox
+  cd /opt/claustrum/inbox
+  rm -rf $APP && mkdir -p $APP && tar -xzf app.tgz -C $APP
+  install -d -o claustrum -g claustrum -m 700 $KEYS /opt/claustrum/private /opt/claustrum/private-sim
+  install -d -o claustrum -g claustrum -m 755 /opt/claustrum/public
+  for f in keys/*.json keys/.env; do install -o claustrum -g claustrum -m 600 "$f" $KEYS/; done
+  install -d -m 700 $ADMIN
+  for f in admin/*.json; do [ -e "$f" ] && install -m 600 "$f" $ADMIN/; done
+  install -m 644 claustrum_router.so $APP/claustrum_router.so
+  [ -f $APP/site/index.html ] && install -o claustrum -g claustrum -m 644 $APP/site/index.html /opt/claustrum/public/index.html
+  cp $APP/deploy/claustrum /usr/local/bin/claustrum && chmod 755 /usr/local/bin/claustrum
+  rm -rf $APP/service/node_modules
+  (cd $APP/service && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
+  chown -R claustrum:claustrum $APP
+  rm -rf /opt/claustrum/inbox
+  systemctl daemon-reload
+  systemctl enable --now claustrum-web claustrum-status.timer
+  systemctl restart claustrum-web
+  for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u; done
+  echo; echo "Installed. Fee wallet: $(pub $KEYS/buyback-executor.json)"; echo "Admin: $( [ -e $ADMIN/admin.json ] && pub $ADMIN/admin.json || echo 'not uploaded')"
+  echo "Status page: http://$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)/status.json"
+  ;;
+status)
+  for u in claustrum-web claustrum-agents claustrum-buyback claustrum-sim; do printf "%-20s %s\n" $u "$(systemctl is-active $u)"; done
+  journalctl -u 'claustrum-*' -n 30 --no-pager -o short-iso | sed -E 's/(api-key=)[^ &"]*/\1REDACTED/g; s/sk-or-v1-[a-f0-9]+/sk-or-REDACTED/g; s/jup_[a-f0-9]+/jup_REDACTED/g'
+  ;;
+sim)
+  systemctl stop claustrum-sim 2>/dev/null || true
+  rm -rf /opt/claustrum/public/sim-*.json* /opt/claustrum/public/sim-private /opt/claustrum/private-sim/* /opt/claustrum/private/sim-*
+  systemd-run --unit claustrum-sim --uid claustrum --gid claustrum -p WorkingDirectory=/opt/claustrum -p EnvironmentFile=$KEYS/.env \
+    /usr/bin/env MAX_TURNS="${2:-60}" OUT_DIR=/opt/claustrum/public PRIVATE_DIR=/opt/claustrum/public/sim-private \
+    /usr/bin/node $APP/service/bin/agents.mjs --simulate --fast
+  echo "sim started: watch http://<server>/sim-turns.jsonl"
+  ;;
+deploy)
+  RPC=$(envval RPC_URL)
+  $SOLANA/solana balance $(pub $ADMIN/admin.json) --url "$RPC"
+  $SOLANA/solana program deploy $APP/claustrum_router.so --program-id $ADMIN/program.json --keypair $ADMIN/admin.json --upgrade-authority $ADMIN/admin.json --url "$RPC" --with-compute-unit-price 50000
+  $SOLANA/solana program show $(pub $ADMIN/program.json) --url "$RPC"
+  ;;
+setup)
+  MINT=${2:-}
+  cd $APP/service && set -a && . $KEYS/.env && set +a
+  node bin/launch.mjs setup --program "$PROGRAM_ID" --admin $(pub $ADMIN/admin.json) --admin-keypair $ADMIN/admin.json \
+    --cranker $(pub $KEYS/cranker.json) --agents $KEYS/agents.json ${MINT:+--mint $MINT} --send
+  ;;
+renounce)
+  cd $APP/service && set -a && . $KEYS/.env && set +a
+  node -e '
+    import("./src/chain/router-ix.mjs").then(async ({ RouterIx }) => {
+      const { Connection, Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } = await import("@solana/web3.js");
+      const fs = await import("node:fs");
+      const admin = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(process.argv[1], "utf8"))));
+      const ix = new RouterIx(process.env.PROGRAM_ID).renounceAdmin({ admin: admin.publicKey.toBase58() });
+      const c = new Connection(process.env.RPC_URL, "confirmed");
+      const { blockhash } = await c.getLatestBlockhash();
+      const tx = new VersionedTransaction(new TransactionMessage({ payerKey: admin.publicKey, recentBlockhash: blockhash, instructions: [new TransactionInstruction({ programId: new PublicKey(ix.programId), keys: ix.keys.map((k) => ({ pubkey: new PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })), data: Buffer.from(ix.data) })] }).compileToV0Message());
+      tx.sign([admin]);
+      const sim = await c.simulateTransaction(tx); if (sim.value.err) { console.error("simulation failed", sim.value.err, sim.value.logs); process.exit(1); }
+      const sig = await c.sendRawTransaction(tx.serialize()); console.log("renounced:", sig);
+    });' $ADMIN/admin.json
+  ;;
+start) systemctl enable --now claustrum-agents claustrum-buyback; claustrum status ;;
+stop) systemctl disable --now claustrum-agents claustrum-buyback; claustrum status ;;
+shred-admin) shred -u $ADMIN/*.json 2>/dev/null || true; rmdir $ADMIN 2>/dev/null || true; echo "admin and program keys removed from this server" ;;
+https)
+  shift; CF=""; [ "${1:-}" = "--cloudflare" ] && { CF=1; shift; }
+  [ $# -ge 1 ] || { echo "usage: claustrum https [--cloudflare] example.com www.example.com data.example.com"; exit 1; }
+  if ! command -v caddy >/dev/null; then
+    apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl >/dev/null
+    curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update >/dev/null && apt-get install -y caddy >/dev/null
+  fi
+  mkdir -p /etc/systemd/system/claustrum-web.service.d
+  printf '[Service]\nEnvironment=PORT=8080\nAmbientCapabilities=\n' > /etc/systemd/system/claustrum-web.service.d/port.conf
+  IP=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
+  # Behind Cloudflare (SSL mode "Full"), Cloudflare holds the public certificate and Caddy uses its own.
+  { echo "$(echo "$@" | sed 's/ /, /g') {"; [ -n "$CF" ] && echo "  tls internal"; echo "  encode gzip"; echo "  reverse_proxy 127.0.0.1:8080"; echo "}"; echo "http://$IP {"; echo "  reverse_proxy 127.0.0.1:8080"; echo "}"; } > /etc/caddy/Caddyfile
+  ufw allow 443/tcp >/dev/null
+  systemctl daemon-reload && systemctl restart claustrum-web && systemctl reload-or-restart caddy
+  sleep 8; for d in "$@"; do curl -sS -o /dev/null -w "https://$d/ -> %{http_code}\n" "https://$d/status.txt" || echo "https://$d not ready yet (DNS?)"; done
+  ;;
+*) sed -n 2,12p "$0" ;;
+esac
