@@ -17,6 +17,31 @@ REPO=git@github.com:claustrum-experiment/claustrum.git
 SOLANA=/opt/solana/bin
 envval() { grep -E "^$1=" $KEYS/.env | head -1 | cut -d= -f2-; }
 pub() { $SOLANA/solana-keygen pubkey "$1"; }
+verify_units() {
+  # The website's Verify panel: read the chain every 5 minutes into public/verify.json (no keys used).
+  cat > /etc/systemd/system/claustrum-verify.service <<'UNIT'
+[Unit]
+Description=CLAUSTRUM verify.json (public chain check for the website)
+After=network-online.target
+[Service]
+Type=oneshot
+User=claustrum
+WorkingDirectory=/opt/claustrum
+EnvironmentFile=/opt/claustrum/keys/.env
+Environment=FEE_WALLET=DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i
+ExecStart=/usr/bin/node /opt/claustrum/app/service/bin/site-verify.mjs --out /opt/claustrum/public/verify.json
+UNIT
+  cat > /etc/systemd/system/claustrum-verify.timer <<'UNIT'
+[Unit]
+Description=CLAUSTRUM verify.json every 5 minutes
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=300
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload && systemctl enable --now claustrum-verify.timer && systemctl start claustrum-verify.service || true
+}
 as_app() { sudo -u claustrum --preserve-env=PATH bash -c "cd /opt/claustrum && set -a && . $KEYS/.env && set +a && $*"; }
 
 case "${1:-}" in
@@ -40,6 +65,7 @@ install)
   systemctl daemon-reload
   systemctl enable --now claustrum-web claustrum-status.timer
   systemctl restart claustrum-web
+  verify_units
   for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u; done
   echo; echo "Installed. Fee wallet: $(pub $KEYS/buyback-executor.json)"; echo "Admin: $( [ -e $ADMIN/admin.json ] && pub $ADMIN/admin.json || echo 'not uploaded')"
   echo "Status page: http://$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)/status.json"
@@ -62,6 +88,7 @@ update)
   cp $APP/deploy/claustrum /usr/local/bin/claustrum && chmod 755 /usr/local/bin/claustrum
   systemctl restart claustrum-web
   for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u && echo "restarted $u"; done
+  verify_units
   echo "Updated. Previous version kept in $APP.old"
   ;;
 github-key)

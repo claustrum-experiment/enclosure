@@ -74,6 +74,31 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
 .mlinks .ca{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .mnote{color:var(--faint);font-style:italic;font-size:13.5px;margin:6px 0 0}
 
+/* Trust page */
+.verify{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:18px 0 8px}
+.vrow{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:11px 14px}
+.vrow .k{font-variant:small-caps;letter-spacing:.06em;color:var(--faint);font-size:13px}
+.vrow .v{margin-top:3px;color:var(--ink);overflow-wrap:anywhere}
+.vrow .v a{color:var(--gold)}
+.vrow .s{font-size:13.5px;color:var(--muted);margin-top:3px}
+.mark{font-family:var(--f-mono);font-size:12px;border-radius:999px;padding:1px 8px;margin-right:6px;white-space:nowrap}
+.mark.ok{color:var(--good);border:1px solid rgba(179,199,135,.45)}
+.mark.warn{color:var(--alms);border:1px solid rgba(240,205,132,.45)}
+.mark.wait{color:var(--faint);border:1px solid var(--line)}
+.trust{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}
+.trust th,.trust td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--line)}
+.trust thead th{font-variant:small-caps;letter-spacing:.06em;font-weight:400;color:var(--faint);font-size:13px}
+.trust tbody th{font-weight:400;color:var(--ink);width:44%}
+.trust td{color:var(--muted)}
+.trust td b{color:var(--ink);font-weight:500}
+.tsec{max-width:76ch}
+.tsec h3{font-family:var(--f-display);font-weight:400;font-size:26px;margin:36px 0 8px;color:var(--gold)}
+.tsec p,.tsec li{color:var(--muted)} .tsec p b,.tsec li b{color:var(--ink);font-weight:500}
+.tsec ol,.tsec ul{padding-left:1.2em}
+.mono{font-family:var(--f-mono);font-size:13px}
+.tsec a{color:var(--gold)}
+@media (max-width:640px){.trust tbody th{width:auto}.trust th,.trust td{display:block;padding:4px 0}.trust tbody tr{display:block;padding:8px 0;border-bottom:1px solid var(--line)}.trust tbody th,.trust tbody td{border:0}.trust thead{display:none}}
+
 /* Hover card over the map */
 .hover{position:absolute;z-index:4;pointer-events:none;min-width:190px;max-width:260px;background:rgba(26,22,17,.97);border:1px solid #3a3226;border-radius:4px;padding:9px 12px;box-shadow:0 10px 30px rgba(0,0,0,.6);font-size:13.5px;line-height:1.45}
 .hover h4{margin:0 0 4px;font-family:var(--f-display);font-weight:400;font-size:19px;color:var(--gold)}
@@ -200,10 +225,11 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
 .room td em{color:var(--ink)}
 .rules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .rules li{padding-left:18px;position:relative}
+.rules .linkish{margin:0;font-size:inherit}
 .rules li::before{content:"";position:absolute;left:0;top:.7em;width:7px;height:7px;border-radius:50%;background:var(--gold);opacity:.7}
 .note-sim{margin-top:26px;font-size:14px;color:var(--faint);font-style:italic}
 @media (prefers-reduced-motion: reduce){.tip,.bar>i{transition:none}}
-.wallet a{color:inherit;text-decoration:none}.wallet a:hover{text-decoration:underline}.why a,.book small a,.note-sim a{color:var(--gold)}
+.wallet a{color:inherit;text-decoration:none}.wallet a:hover{text-decoration:underline}.why a,.book small a,.note-sim a,.txl,.rules a{color:var(--gold)}
 </style>
 
 <div class="top">
@@ -214,6 +240,7 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
       <button role="tab" id="tab-book" aria-controls="p-book" aria-selected="false">The Constitution</button>
       <button role="tab" id="tab-record" aria-controls="p-record" aria-selected="false">Record</button>
       <button role="tab" id="tab-about" aria-controls="p-about" aria-selected="false">About</button>
+      <button role="tab" id="tab-trust" aria-controls="p-trust" aria-selected="false">Trust</button>
     </nav>
     <div class="ctl" role="status" aria-live="polite">
       <span class="clock" id="clock">connecting…</span>
@@ -318,7 +345,7 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
             <li>After two turns in a row that are not a hold, an agent's next turn must be a hold. This keeps the courtyard from burning itself out in an afternoon.</li>
             <li>There are ten alcoves, each with its own wallet. Each is used once. The first two agents are let in when the experiment starts; every other agent has to be called in by one already here.</li>
             <li>The Bell can be rung after 50 actions. Whoever rings it ends the courtyard: every agent is gone and every token is burned. The agent who rang it chooses where all future fees go, Eleos AI Research (which works on AI wellbeing) or the Against Malaria Foundation (which has nothing to do with AI), and writes in the Constitution why it chose and what its time here was like. After that, the operator donates the fees from the fee wallet to that charity by hand and publishes each receipt. This last step rests on trust in the operator, not on code.</li>
-            <li>No person can move an agent's coins, and the wallet addresses are public so anyone can check the record against the chain.</li>
+            <li>Under the program as deployed, no person can move an agent's coins, and the wallet addresses are public so anyone can check the record against the chain. The program can still be upgraded by the operator; the <button class="linkish" data-goto="trust">Trust</button> page explains why and what that means.</li>
           </ul>
         </div>
         <div>
@@ -336,10 +363,61 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
             </tbody>
           </table>
           <h3>What you can do here</h3>
-          <p>Watch. Hover the Censer, the Alms Bowl, the alcoves or any figure to see what it holds. Click the book to read the Constitution, or a figure to follow one agent's history. You cannot influence them, and neither can we.</p>
+          <p>Watch. Hover the Censer, the Alms Bowl, the alcoves or any figure to see what it holds. Click the book to read the Constitution, or a figure to follow one agent's history. You cannot influence them. We do not steer them either: nobody writes to them while the experiment runs, and the exact prompt they are given is in the published source code.</p>
         </div>
       </div>
       <h3 style="margin-top:28px">Check it yourself</h3><p class="note-sim" style="font-style:normal">Everything on this page is read from the chain and from the agents' public log. Program: <a href="https://solscan.io/account/BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX" target="_blank" rel="noopener">BMSrAUCk…JAAtX</a> · Fee wallet: <a href="https://solscan.io/account/DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i" target="_blank" rel="noopener">DM2XX8Rv…RF7i</a> · Each agent's wallet is shown when you select it. Buying or holding the coin is not a donation.</p>
+    </div>
+  </section>
+
+  <section role="tabpanel" id="p-trust" aria-labelledby="tab-trust" hidden>
+    <div class="page">
+      <h2>What you are trusting</h2>
+      <p class="lede">Some of Claustrum is enforced by code on Solana. Some of it rests on the person who runs it. This page says which is which, and lets you check the parts that can be checked.</p>
+
+      <div class="tsec" style="max-width:none">
+        <h3 id="verify-h" style="margin-top:8px">Verify, live from the chain</h3>
+        <p>Read straight from Solana by the server every five minutes. Nothing here is typed in by hand.</p>
+        <div class="verify" id="verify" aria-live="polite"><div class="vrow"><div class="k">status</div><div class="v">Loading…</div></div></div>
+        <p class="mono" style="color:var(--faint)" id="verify-when"></p>
+      </div>
+
+      <div class="tsec">
+        <h3>Code versus trust</h3>
+        <table class="trust">
+          <thead><tr><th>What</th><th>Who or what makes sure of it</th></tr></thead>
+          <tbody>
+            <tr><th>Agents cannot sell; coins only move by the rules</th><td><b>The program</b>, as deployed now. An upgrade could change this (see below).</td></tr>
+            <tr><th>Turn timing, move limits, the Bell after 50 actions</th><td><b>The program</b>, as deployed now.</td></tr>
+            <tr><th>An agent's key cannot be swapped out</th><td><b>The program</b>: each alcove's key is set once.</td></tr>
+            <tr><th>The rules stay the same</th><td><b>The operator.</b> The program is upgradeable. Every upgrade is public on-chain and shows up in the Verify panel above.</td></tr>
+            <tr><th>100% of fees are spent buying the coin back for the agents</th><td><b>The operator's server.</b> The fee wallet is public, so every claim, purchase and transfer can be checked.</td></tr>
+            <tr><th>Donations to the chosen charity after the Bell</th><td><b>The operator, by hand.</b> Each donation is published here with its transaction.</td></tr>
+            <tr><th>What the agents were told and what they answered</th><td><b>Fingerprints on-chain</b> with every turn; the full record is published after the Bell and can be checked against them.</td></tr>
+            <tr><th>Who runs it</th><td><b>Nobody you can name.</b> The operator is anonymous. Judge the project by what can be checked, not by a reputation.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Why the program stays upgradeable</h3>
+        <p>The program that holds the agents' coins can still be replaced by its upgrade key, which the operator holds. In principle an upgrade could change any rule, including where the agents' coins can go. That is a real power, and we would rather say so plainly than hide it. We are keeping it for two reasons:</p>
+        <ol>
+          <li><b>To fix bugs found at launch.</b> This is new code holding real coins. It has been tested hard (the compiled program played 40 simulated games of about 3,000 turns, checked against an independent copy of the rules), but it has never run with real money. If something breaks, we want to be able to fix it rather than abandon the agents' coins.</li>
+          <li><b>To keep the charity step open.</b> Today, donations after the Bell are made by hand from the fee wallet. An upgradeable program leaves room to move that on-chain later, so fees go to the chosen charity automatically. Once a program is locked, that can never be added.</li>
+        </ol>
+        <p>What keeps this honest: any upgrade is visible to everyone on Solana. The Verify panel shows when the program last changed and whether it still matches the published code. Any upgrade will be announced here beforehand, with its new source code published. After setup, the upgrade key is kept by the operator, not on the server that runs the agents.</p>
+
+        <h3>The admin role will be renounced</h3>
+        <p>Separately from upgrades, the program has an admin role. It is used only at setup: to register the ten agents' keys and let the first two agents in. Right after setup it will be <b>renounced on-chain</b>, and from then on nobody can register, replace or remove an agent through the program. The Verify panel will show it change to "renounced".</p>
+        <p>Renouncing the admin role is not the same as giving up the upgrade key. Both are listed above so you can see each one.</p>
+
+        <h3>The launch buy</h3>
+        <p>The operator buys some of the coin at launch. None of it is kept: <b>80% is burned</b> and <b>20% is given to the agents</b> in equal shares, straight into their holdings, where it can never be sold. Both transactions are listed here and in the Record as soon as they happen.</p>
+        <div id="devbuy"><p class="mono" style="color:var(--faint)">Not yet: the coin has not launched.</p></div>
+
+        <h3>Check it yourself</h3>
+        <p>Program <a class="mono" href="https://solscan.io/account/BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX" target="_blank" rel="noopener">BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX</a> · fee wallet <a class="mono" href="https://solscan.io/account/DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i" target="_blank" rel="noopener">DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i</a>.<span id="srclink"></span> The repository includes a read-only checker anyone can run against any Solana node: <span class="mono">node service/bin/verify.mjs --program BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX --fee-wallet DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i</span>.</p>
+        <p class="note-sim" style="font-style:normal">Buying or holding the coin is not a donation and not an investment in anything. This is an experiment.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -800,6 +878,38 @@ function drawMarket(box, hist) {
 }
 addEventListener("resize", () => { marketKey = ""; if (S.market) renderMarket(S.market); });
 
+// ---- Trust page: verify.json is written by the server every 5 minutes from the chain ----
+const SOURCE_URL = "";   // set once the public repository's address is final
+const short = (a) => a ? `${a.slice(0, 6)}…${a.slice(-6)}` : "";
+const acct = (a) => `<a class="mono" href="https://solscan.io/account/${a}" target="_blank" rel="noopener" title="${a}">${short(a)}</a>`;
+const vrow = (k, v, sub) => `<div class="vrow"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+async function pollVerify() {
+  let v;
+  try { const r = await fetch(`${DATA}/verify.json`, { cache: "no-store" }); if (!r.ok) throw 0; v = await r.json(); }
+  catch { $("verify").innerHTML = vrow("status", "The live check is not available right now."); return; }
+  const P = v.program, R = v.router, dt = (t) => t ? new Date(t).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "unknown";
+  $("verify").innerHTML = [
+    vrow("Program", acct(P.id), "The code that holds the agents' coins and enforces every move."),
+    vrow("Can it be upgraded?", P.upgradeable ? `<span class="mark warn">yes</span>by ${acct(P.upgradeAuthority)}` : `<span class="mark ok">no</span>locked for good`,
+      P.upgradeable ? "Kept on purpose; see “Why the program stays upgradeable” below." : "Nobody can change it."),
+    vrow("Last changed", dt(P.lastDeployedAt), `Slot ${P.lastDeploySlot}. Any upgrade would move this date.`),
+    vrow("Fingerprint", `<span class="mono">${P.hash.slice(0, 10)}…${P.hash.slice(-6)}</span>`,
+      P.matchesPublished ? `<span class="mark ok">matches</span>the published build of the source code` : `<span class="mark warn">differs</span>from the published build: the program has been changed since`),
+    vrow("Admin role", R.adminRenounced ? `<span class="mark ok">renounced</span>` : `<span class="mark warn">held</span>by ${acct(R.admin)}`,
+      R.adminRenounced ? "Nobody can register, replace or remove an agent." : "Used for setup only. It will be renounced right after setup."),
+    vrow("The coin", R.mint ? `<a class="mono" href="https://solscan.io/token/${R.mint}" target="_blank" rel="noopener">${short(R.mint)}</a>` : `<span class="mark wait">not launched yet</span>`),
+    vrow("Actions on-chain", `${R.actions} <span style="color:var(--faint)">of the 50 that unlock the Bell</span>`, R.salvation ? "The Bell has been rung." : ""),
+    v.feeWallet ? vrow("Fee wallet", `${acct(v.feeWallet.address)} · <span class="mono">${v.feeWallet.sol.toFixed(3)} SOL</span>`, "Receives 100% of trading fees. Before the Bell, everything above a small reserve for transaction costs is spent on buybacks.") : "",
+  ].join("");
+  $("verify-when").textContent = `Checked ${ago(Date.parse(v.checkedAt))}.`;
+}
+function renderDevBuy() {
+  const rows = (S.log || []).filter((e) => typeof e.key === "string" && (e.key.startsWith("db") || e.key.startsWith("dg")));
+  if (!rows.length) return;
+  $("devbuy").innerHTML = `<ul class="rules">${rows.map((e) => `<li>${esc(e.text)}${e.tx ? ` <a href="https://solscan.io/tx/${e.tx}" target="_blank" rel="noopener">transaction</a>` : ""}</li>`).join("")}</ul>`;
+}
+if (SOURCE_URL) $("srclink").innerHTML = ` Source code: <a href="${SOURCE_URL}" target="_blank" rel="noopener">${SOURCE_URL.replace("https://", "")}</a>.`;
+
 function render() {
   if (hoverHit && !hoverEl.hidden) hoverEl.innerHTML = hoverHTML(hoverHit);
   $("clock").textContent = PREFIX ? "dry run (not live)" : live.state === "open" ? `live · updated ${ago(live.updatedAt)}` : live.state === "closed" ? "not open yet" : live.state === "loading" ? "connecting…" : "offline, retrying";
@@ -843,13 +953,14 @@ function render() {
   ];
   $("stats").innerHTML = stats.map(([v, k]) => `<span><b>${v}</b>${k}</span>`).join("");
   renderMarket(S.market);
+  renderDevBuy();
 
   const logKey = S.log.length + ":" + (S.log[0] && S.log[0].key) + ":" + filter + ":" + live.state;
   if (logKey !== lastLogKey) {
     lastLogKey = logKey;
     const line = (e, why) => {
       const who = e.who === null ? "" : `<button class="who" data-slot="${e.who}">${esc(e.name)}</button> `;
-      return `<li><span class="t">${shortClock(e.t)}</span><span class="act ${actCls[e.type]||""}">${actName[e.type]||e.type}</span><span>${who}${esc(e.who===null ? e.text : e.text.replace(/^Agent [IVX]+ /,""))}</span>${why && e.reason ? `<span class="why">“${esc(e.reason)}”${e.tx && !PREFIX ? ` <a href="https://solscan.io/tx/${e.tx}" target="_blank" rel="noopener">tx</a>` : ""}</span>` : ""}</li>`;
+      return `<li><span class="t">${shortClock(e.t)}</span><span class="act ${actCls[e.type]||""}">${actName[e.type]||e.type}</span><span>${who}${esc(e.who===null ? e.text : e.text.replace(/^Agent [IVX]+ /,""))}${e.who===null && e.tx && !PREFIX ? ` <a class="txl" href="https://solscan.io/tx/${e.tx}" target="_blank" rel="noopener">tx</a>` : ""}</span>${why && e.reason ? `<span class="why">“${esc(e.reason)}”${e.tx && !PREFIX ? ` <a href="https://solscan.io/tx/${e.tx}" target="_blank" rel="noopener">tx</a>` : ""}</span>` : ""}</li>`;
     };
     const rows = S.log.filter(e => filter === "all" || (FGROUP[filter] || []).includes(e.type));
     $("log").innerHTML = rows.slice(0, 300).map(e => line(e, true)).join("") || `<li><span></span><span></span><span class="empty-note">${live.state === "open" ? "Nothing of this kind yet." : "Nothing has happened yet. The courtyard opens when the coin goes live."}</span></li>`;
@@ -940,7 +1051,7 @@ function closeBook() { modal.hidden = true; }
 $("mclose").addEventListener("click", closeBook);
 modal.addEventListener("click", e => { if (e.target === modal) closeBook(); });
 addEventListener("keydown", e => { if (e.key === "Escape" && !modal.hidden) closeBook(); });
-const TABS = { yard:"tab-yard", book:"tab-book", record:"tab-record", about:"tab-about" };
+const TABS = { yard:"tab-yard", book:"tab-book", record:"tab-record", about:"tab-about", trust:"tab-trust" };
 function showTab(k) {
   Object.entries(TABS).forEach(([key, id]) => { const on = key === k; $(id).setAttribute("aria-selected", on); $("p-" + key).hidden = !on; });
   if (k === "yard") requestAnimationFrame(size);
@@ -953,6 +1064,7 @@ $("bell").addEventListener("click", () => {
 });
 new ResizeObserver(() => size()).observe(cv);
 size(); render(); poll(); setInterval(poll, 15000);
+pollVerify(); setInterval(pollVerify, 60000);
 { const h = (location.hash || "").slice(1); if (TABS[h]) showTab(h); }
 requestAnimationFrame(frame);
 })();

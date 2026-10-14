@@ -61,7 +61,7 @@ export function buildSite(snap, turns, fees = [], market = null) {
     log.push({ t, who: a.slot, name: a.name, type, text: `${a.name} ${text}`, reason: e.reason || "", tx: e.tx || null, key: e.digest || e.tx || `${e.agentIndex}-${e.turn}` });
   }
 
-  let bought = 0, spentSol = 0, buybacks = 0, heldSol = 0;
+  let bought = 0, spentSol = 0, buybacks = 0, heldSol = 0, devBurned = 0, devGiven = 0;
   for (const f of fees) {
     if (f.simulated) continue;
     const t = Date.parse(f.at), sol = Number(f.lamports || 0) / 1e9;
@@ -69,12 +69,16 @@ export function buildSite(snap, turns, fees = [], market = null) {
     if (f.kind === "buyback") { spentSol += sol; buybacks++; bought += units(f.expectedOut); log.push({ t, who: null, type: "fees", text: `${sol.toFixed(3)} SOL spent buying back the coin for the agents.`, tx: f.tx || null, key: "b" + (f.tx || t) }); }
     if (f.kind === "distribute") log.push({ t, who: null, type: "fees", text: `Split evenly into alcoves ${(f.alcoves || []).map((k) => ROMAN[k - 1]).join(", ")}.`, tx: f.tx || null, key: "d" + (f.tx || t) });
     if (f.kind === "held-for-charity") heldSol = sol;
+    // The launch buy, handled in public: 80% burned, 20% given to the agents.
+    const dev = (u) => Number(u || 0) / 10 ** (f.decimals ?? snap.decimals ?? 6);
+    if (f.kind === "dev-burn") { devBurned += dev(f.units); log.push({ t, who: null, type: "burn", text: `${fmt(dev(f.units))} tokens from the launch buy burned (80%).`, tx: f.tx || null, key: "db" + (f.tx || t) }); }
+    if (f.kind === "dev-gift") { devGiven += dev(f.units); log.push({ t, who: null, type: "fees", text: `${fmt(dev(f.units))} tokens from the launch buy given to the agents (20%), ${fmt(dev(f.eachUnits))} each to alcoves ${(f.alcoves || []).map((k) => ROMAN[k - 1]).join(", ")}.`, tx: f.tx || null, key: "dg" + (f.tx || t) }); }
   }
   log.sort((p, q) => q.t - p.t);
 
   return {
     updatedAt: snap.updatedAt,
-    totals: { actions: snap.totalTurns || 0, bowl: num(snap.bowl), sealed: num(snap.sealed), burned: num(snap.burned), bought, spentSol, buybacks, heldSol },
+    totals: { actions: snap.totalTurns || 0, bowl: num(snap.bowl), sealed: num(snap.sealed), burned: num(snap.burned), bought, spentSol, buybacks, heldSol, devBurned, devGiven },
     salvation: snap.salvation ? { charity: snap.salvation.charity, by: bell?.by ?? "an agent", t: bell?.t ?? Date.parse(snap.updatedAt), words: snap.salvation.lastWords ?? bell?.words ?? "" } : null,
     agents,
     wall: wall.slice(-WALL),                // the latest lines, oldest first; every line is in turns.jsonl
