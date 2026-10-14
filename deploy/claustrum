@@ -57,7 +57,7 @@ install)
   for f in admin/*.json; do [ -e "$f" ] && install -m 600 "$f" $ADMIN/; done
   install -m 644 claustrum_router.so $APP/claustrum_router.so
   [ -f $APP/site/index.html ] && install -o claustrum -g claustrum -m 644 $APP/site/index.html /opt/claustrum/public/index.html
-  cp $APP/deploy/claustrum /usr/local/bin/claustrum && chmod 755 /usr/local/bin/claustrum
+  install -m 755 $APP/deploy/claustrum /usr/local/bin/claustrum.new && mv -f /usr/local/bin/claustrum.new /usr/local/bin/claustrum   # rename, never overwrite: this script may be the one running
   rm -rf $APP/service/node_modules
   (cd $APP/service && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
   chown -R claustrum:claustrum $APP
@@ -85,7 +85,7 @@ update)
   chown -R claustrum:claustrum $NEW
   rm -rf $APP.old && { [ -d $APP ] && mv $APP $APP.old || true; } && mv $NEW $APP
   install -o claustrum -g claustrum -m 644 $APP/site/index.html /opt/claustrum/public/index.html
-  cp $APP/deploy/claustrum /usr/local/bin/claustrum && chmod 755 /usr/local/bin/claustrum
+  install -m 755 $APP/deploy/claustrum /usr/local/bin/claustrum.new && mv -f /usr/local/bin/claustrum.new /usr/local/bin/claustrum   # rename, never overwrite: this script may be the one running
   systemctl restart claustrum-web
   for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u && echo "restarted $u"; done
   verify_units
