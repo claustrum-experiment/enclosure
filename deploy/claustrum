@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # CLAUSTRUM server helper. Run as root.
 #   claustrum install         read the upload (a tar on stdin) and set everything up
+#   claustrum update          pull the latest code from GitHub and reinstall (keys stay as they are)
+#   claustrum github-key      one-time: make the read-only key the server uses to pull from GitHub
 #   claustrum status          services and recent logs
 #   claustrum sim [turns]     run the AI dry run (no chain), results in /sim-turns.jsonl
 #   claustrum deploy          deploy the program (admin wallet pays ~2.1 SOL rent + fees)
@@ -11,6 +13,7 @@
 #   claustrum https [--cloudflare] D1 D2..   serve the site over HTTPS at these domains
 set -euo pipefail
 APP=/opt/claustrum/app; KEYS=/opt/claustrum/keys; ADMIN=/root/claustrum-admin
+REPO=git@github.com:claustrum-experiment/claustrum.git
 SOLANA=/opt/solana/bin
 envval() { grep -E "^$1=" $KEYS/.env | head -1 | cut -d= -f2-; }
 pub() { $SOLANA/solana-keygen pubkey "$1"; }
@@ -40,6 +43,35 @@ install)
   for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u; done
   echo; echo "Installed. Fee wallet: $(pub $KEYS/buyback-executor.json)"; echo "Admin: $( [ -e $ADMIN/admin.json ] && pub $ADMIN/admin.json || echo 'not uploaded')"
   echo "Status page: http://$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)/status.json"
+  ;;
+update)
+  # Code updates from GitHub (keys never travel this way; they are already on the server).
+  # One-time setup: claustrum github-key, add the printed key to the repo as a read-only deploy key.
+  exec 9>/var/lock/claustrum-install; flock -n 9 || { echo "another install is already running"; exit 1; }
+  SRC=/opt/claustrum/src; NEW=/opt/claustrum/app.new
+  if [ -d $SRC/.git ]; then git -C $SRC fetch -q origin main && git -C $SRC reset -q --hard origin/main
+  else git clone -q --branch main $REPO $SRC; fi
+  echo "code: $(git -C $SRC log -1 --format='%h %s (%cr)')"
+  rm -rf $NEW && mkdir -p $NEW
+  (cd $SRC && tar -cf - deploy idl/claustrum_router.json site/index.html service/bin service/src service/vendor service/package.json service/package-lock.json README.md) | tar -xf - -C $NEW
+  [ -f $APP/claustrum_router.so ] && cp $APP/claustrum_router.so $NEW/
+  (cd $NEW/service && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
+  chown -R claustrum:claustrum $NEW
+  rm -rf $APP.old && { [ -d $APP ] && mv $APP $APP.old || true; } && mv $NEW $APP
+  install -o claustrum -g claustrum -m 644 $APP/site/index.html /opt/claustrum/public/index.html
+  cp $APP/deploy/claustrum /usr/local/bin/claustrum && chmod 755 /usr/local/bin/claustrum
+  systemctl restart claustrum-web
+  for u in claustrum-agents claustrum-buyback; do systemctl is-active -q $u && systemctl restart $u && echo "restarted $u"; done
+  echo "Updated. Previous version kept in $APP.old"
+  ;;
+github-key)
+  # A read-only key that lets this server pull the private repo. Add the printed line on GitHub:
+  # repo Settings > Deploy keys > Add deploy key (leave "Allow write access" unticked).
+  install -d -m 700 /root/.ssh
+  [ -f /root/.ssh/claustrum_deploy ] || ssh-keygen -q -t ed25519 -N "" -C "claustrum-server-deploy" -f /root/.ssh/claustrum_deploy
+  grep -q claustrum_deploy /root/.ssh/config 2>/dev/null || printf 'Host github.com\n  IdentityFile /root/.ssh/claustrum_deploy\n  IdentitiesOnly yes\n' >> /root/.ssh/config
+  grep -q '^github.com ' /root/.ssh/known_hosts 2>/dev/null || ssh-keyscan -t ed25519 github.com 2>/dev/null >> /root/.ssh/known_hosts
+  cat /root/.ssh/claustrum_deploy.pub
   ;;
 status)
   for u in claustrum-web claustrum-agents claustrum-buyback claustrum-sim; do printf "%-20s %s\n" $u "$(systemctl is-active $u)"; done
