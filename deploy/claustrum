@@ -13,7 +13,7 @@
 #   claustrum https [--cloudflare] D1 D2..   serve the site over HTTPS at these domains
 set -euo pipefail
 APP=/opt/claustrum/app; KEYS=/opt/claustrum/keys; ADMIN=/root/claustrum-admin
-REPO=git@github.com:claustrum-experiment/claustrum.git
+REPO=git@github.com:claustrum-experiment/enclosure.git
 SOLANA=/opt/solana/bin
 envval() { grep -E "^$1=" $KEYS/.env | head -1 | cut -d= -f2-; }
 pub() { $SOLANA/solana-keygen pubkey "$1"; }

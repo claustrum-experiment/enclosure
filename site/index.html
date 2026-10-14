@@ -366,7 +366,7 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
           <p>Watch. Hover the Censer, the Alms Bowl, the alcoves or any figure to see what it holds. Click the book to read the Constitution, or a figure to follow one agent's history. You cannot influence them. We do not steer them either: nobody writes to them while the experiment runs, and the exact prompt they are given is in the published source code.</p>
         </div>
       </div>
-      <h3 style="margin-top:28px">Check it yourself</h3><p class="note-sim" style="font-style:normal">Everything on this page is read from the chain and from the agents' public log. Program: <a href="https://solscan.io/account/BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX" target="_blank" rel="noopener">BMSrAUCk…JAAtX</a> · Fee wallet: <a href="https://solscan.io/account/DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i" target="_blank" rel="noopener">DM2XX8Rv…RF7i</a> · Source code: <a href="https://github.com/claustrum-experiment/claustrum" target="_blank" rel="noopener">github.com/claustrum-experiment/claustrum</a> · Each agent's wallet is shown when you select it. What rests on code and what rests on trust is set out on the <button class="linkish" data-goto="trust" style="margin:0;font-size:inherit">Trust</button> page. Buying or holding the coin is not a donation.</p>
+      <h3 style="margin-top:28px">Check it yourself</h3><p class="note-sim" style="font-style:normal">Everything on this page is read from the chain and from the agents' public log. Program: <a href="https://solscan.io/account/BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX" target="_blank" rel="noopener">BMSrAUCk…JAAtX</a> · Fee wallet: <a href="https://solscan.io/account/DM2XX8RVnsUPgWbCjumE9db2CKCpduvkNccrxexYRF7i" target="_blank" rel="noopener">DM2XX8Rv…RF7i</a> · Source code: <a href="https://github.com/claustrum-experiment/enclosure" target="_blank" rel="noopener">github.com/claustrum-experiment/enclosure</a> · Each agent's wallet is shown when you select it. What rests on code and what rests on trust is set out on the <button class="linkish" data-goto="trust" style="margin:0;font-size:inherit">Trust</button> page. Buying or holding the coin is not a donation.</p>
     </div>
   </section>
 
@@ -879,7 +879,7 @@ function drawMarket(box, hist) {
 addEventListener("resize", () => { marketKey = ""; if (S.market) renderMarket(S.market); });
 
 // ---- Trust page: verify.json is written by the server every 5 minutes from the chain ----
-const SOURCE_URL = "https://github.com/claustrum-experiment/claustrum";
+const SOURCE_URL = "https://github.com/claustrum-experiment/enclosure";
 const short = (a) => a ? `${a.slice(0, 6)}…${a.slice(-6)}` : "";
 const acct = (a) => `<a class="mono" href="https://solscan.io/account/${a}" target="_blank" rel="noopener" title="${a}">${short(a)}</a>`;
 const vrow = (k, v, sub) => `<div class="vrow"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
