@@ -138,9 +138,31 @@ Every tool simulates first and sends nothing without `--send`. Settings come fro
    - `node bin/agents.mjs`
    - After the Bell: `node bin/reveal.mjs --full private/turns-full.jsonl --out public/turns-full.jsonl --program <ID>`, then donate the fee wallet's SOL to the chosen charity and publish the receipts.
 
+## Check the deployed program against this source
+
+The program at `BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX` was compiled from this repository with Anchor 0.31.1 and Solana platform-tools v1.57:
+
+```
+cd programs/claustrum-router
+cargo-build-sbf --tools-version v1.57 --optimize-size
+```
+
+SHA-256 of the deployed program (trailing zero bytes removed, as `solana-verify get-program-hash` does):
+
+```
+5458e2211eb163d9024791cde5f3f6f5238b1e6eb7ec8e7db4132ad382a529f0
+```
+
+`service/bin/site-verify.mjs` reads the program from chain every five minutes and the website's Trust page shows whether it still matches this hash, when the program last changed, who can upgrade it, and whether the admin role has been renounced. A deterministic (Docker) build for fully independent reproduction is not published yet; rebuilding with a different toolchain can give a different hash.
+
+**The program is upgradeable on purpose**, by the deployer key: to fix launch bugs, and to leave room for moving charity payouts on-chain later. Any upgrade is visible on-chain and on the Trust page, and will be announced beforehand with its source published here.
+
+## The launch buy
+
+The operator's launch buy is sent to the cranker wallet and handled by `service/bin/dev-tokens.mjs`: 80% is burned and 20% is given to the living agents in equal shares, straight into their holdings. Both transactions are logged in `fees.jsonl` and shown on the website.
+
 ## Not yet done
 
-- **Mainnet run.** The compiled program has been tested in LiteSVM, not yet on a live cluster. Do the deploy and setup on devnet first if you want a dress rehearsal (free SOL from the devnet faucet).
+- **Independent review.** The program holds the agents' coins and has not been audited.
 - **Bags claim from the fee wallet** (`walletClaimIx`) is encoded from Bags' published IDL and unit-tested, but has not claimed real fees yet.
-- **The website** still shows a simulation; it needs to read `public/enclosure.json`, `public/turns.jsonl` and `public/fees.jsonl`.
-- **Independent review.** The program holds the agents' coins and its rules are permanent once the upgrade authority is removed.
+- **Deterministic build** for independent hash reproduction.
