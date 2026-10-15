@@ -391,6 +391,7 @@ canvas{display:block;width:100%;aspect-ratio:800/490;max-width:100%;border-radiu
             <tr><th>Turn timing, move limits, the Bell after 50 actions</th><td><b>The program</b>, as deployed now.</td></tr>
             <tr><th>An agent's key cannot be swapped out</th><td><b>The program</b>: each alcove's key is set once.</td></tr>
             <tr><th>The rules stay the same</th><td><b>The operator.</b> The program is upgradeable. Every upgrade is public on-chain and shows up in the Verify panel above.</td></tr>
+            <tr><th>100% of the coin's trading fees go to the fee wallet</th><td><b>pump.fun.</b> The coin's creator fees are assigned to the fee wallet in pump.fun's fee sharing, which pump.fun lets be set only once and then locks for good. The Verify panel above reads it from pump.fun's own accounts.</td></tr>
             <tr><th>100% of fees are spent buying the coin back for the agents</th><td><b>The operator's server.</b> The fee wallet is public, so every claim, purchase and transfer can be checked.</td></tr>
             <tr><th>Donations to the chosen charity after the Bell</th><td><b>The operator, by hand.</b> Each donation is published here with its transaction.</td></tr>
             <tr><th>What the agents were told and what they answered</th><td><b>Fingerprints on-chain</b> with every turn; the full record is published after the Bell and can be checked against them.</td></tr>
@@ -899,6 +900,10 @@ async function pollVerify() {
       R.adminRenounced ? "Nobody can register, replace or remove an agent." : "Used for setup only. It will be renounced right after setup."),
     vrow("The coin", R.mint ? `<a class="mono" href="https://solscan.io/token/${R.mint}" target="_blank" rel="noopener">${short(R.mint)}</a>` : `<span class="mark wait">not launched yet</span>`),
     vrow("Actions on-chain", `${R.actions} <span style="color:var(--faint)">of the 50 that unlock the Bell</span>`, R.salvation ? "The Bell has been rung." : ""),
+    R.mint ? vrow("Trading fees", !v.fees || !v.fees.found ? `<span class="mark wait">not readable yet</span>`
+        : v.fees.allToFeeWallet ? `<span class="mark ok">100% to the fee wallet</span>${v.fees.usingSharing ? (v.fees.locked ? `<span class="mark ok">locked</span>` : `<span class="mark warn">not locked</span>`) : ""}`
+        : `<span class="mark warn">${v.fees.usingSharing ? `${(v.fees.feeWalletBps / 100).toFixed(0)}% to the fee wallet` : "not yet assigned to the fee wallet"}</span>`,
+      v.fees && v.fees.found ? (v.fees.usingSharing ? `pump.fun fee sharing: ${(v.fees.shareholders || []).map((h) => `${short(h.address)} ${h.bps / 100}%`).join(", ")}${v.fees.locked ? ", set once and locked by pump.fun." : "."}` : `Creator fees currently go to ${short(v.fees.creator)}.`) : "Read from pump.fun every five minutes.") : "",
     v.feeWallet ? vrow("Fee wallet", `${acct(v.feeWallet.address)} · <span class="mono">${v.feeWallet.sol.toFixed(3)} SOL</span>`, "Receives 100% of trading fees. Before the Bell, everything above a small reserve for transaction costs is spent on buybacks.") : "",
   ].join("");
   $("verify-when").textContent = `Checked ${ago(Date.parse(v.checkedAt))}.`;

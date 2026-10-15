@@ -78,7 +78,7 @@ update)
   else git clone -q --branch main $REPO $SRC; fi
   echo "code: $(git -C $SRC log -1 --format='%h %s (%cr)')"
   rm -rf $NEW && mkdir -p $NEW
-  (cd $SRC && tar -cf - deploy idl/claustrum_router.json site/index.html service/bin service/src service/vendor service/package.json service/package-lock.json README.md) | tar -xf - -C $NEW
+  (cd $SRC && tar -cf - deploy idl/claustrum_router.json site/index.html service/bin service/src service/package.json service/package-lock.json README.md) | tar -xf - -C $NEW
   [ -f $APP/claustrum_router.so ] && cp $APP/claustrum_router.so $NEW/
   (cd $NEW/service && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
   chown -R claustrum:claustrum $NEW

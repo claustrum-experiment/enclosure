@@ -7,7 +7,7 @@ import { splitEvenly, distributionBatches, transferCheckedIx, createAtaIdempoten
 import { setupPlan } from "../src/launch.mjs";
 import { turnDigest } from "../src/runner/runner.mjs";
 import { canonicalJson } from "../src/canonical.mjs";
-import { ata } from "../src/chain/bags.mjs";
+import { ata } from "../src/chain/solana.mjs";
 
 const rand = () => Keypair.generate().publicKey.toBase58();
 const same = (mine, theirs) => {
@@ -60,14 +60,11 @@ test("turn digests are deterministic and cover prompt, answer, agent and turn nu
   }
 });
 
-test("fee wallet: claims as itself, unwraps like spl-token, keeps a reserve", async () => {
+test("fee wallet: unwraps like spl-token, keeps a reserve", async () => {
   const { createCloseAccountInstruction } = await import("@solana/spl-token");
   const { closeAccountIx, spendableLamports } = await import("../src/buyback.mjs");
-  const { walletClaimIx } = await import("../src/chain/bags.mjs");
   const owner = rand(), acct = rand(), mint = rand();
   same(closeAccountIx({ account: acct, destination: owner, owner }), createCloseAccountInstruction(new PublicKey(acct), new PublicKey(owner), new PublicKey(owner)));
-  const ix = walletClaimIx({ payer: owner, user: owner, baseMint: mint, claimerIndex: 2 });
-  assert.ok(ix.keys.some((k) => k.pubkey === owner && k.isSigner), "the wallet signs its own claim");
   const S = 1_000_000_000n;
   assert.equal(spendableLamports(S, { reserve: S / 20n, minimum: S / 20n }), S - S / 20n);
   assert.equal(spendableLamports(S / 20n + S / 100n, { reserve: S / 20n, minimum: S / 20n }), 0n);

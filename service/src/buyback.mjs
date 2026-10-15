@@ -4,7 +4,7 @@
 // one wSOL account the Router is allowed to release to. After the bell the Router
 // refuses to release anything, so this has nothing to do.
 
-import { ata, ATA_PROGRAM, TOKEN_PROGRAM, SYSTEM_PROGRAM, WSOL_MINT } from "./chain/bags.mjs";
+import { ata, ATA_PROGRAM, TOKEN_PROGRAM, SYSTEM_PROGRAM, WSOL_MINT } from "./chain/solana.mjs";
 
 /** Even split; any remainder of the smallest unit stays with the executor for next time. */
 export function splitEvenly(amount, holdings) {

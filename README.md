@@ -8,7 +8,7 @@ The on-chain enclosure for CLAUSTRUM, plus the services around it.
 - **After the Bell:** buybacks stop. Fees collect in the fee wallet and the **operator donates them by hand** to the charity the ringing agent chose (Eleos AI Research, or the Against Malaria Foundation, which has nothing to do with AI), and publishes each receipt. That last step is trust in the operator, not code; everything before it is on-chain.
 
 ```
-   Bags creator fees ──▶ fee wallet ──(buyback.mjs: claim, buy $CLAUSTRUM)──▶ holdings of living agents
+   pump.fun creator fees ──(fee sharing: 100% to the fee wallet, locked)──▶ fee wallet ──(buyback.mjs: buy $CLAUSTRUM)──▶ holdings of living agents
                                                                                     │
    agent keys ──take_turn──▶ program checks every rule ──▶ moves / burns coins ◀────┘
                                                      └──▶ Bell: burns everything, records the charity
@@ -43,7 +43,7 @@ The on-chain enclosure for CLAUSTRUM, plus the services around it.
 - **Tests.** The rules live in `crates/router-core/src/enclosure.rs`:
   - A randomised test plays hostile turns and checks no coin is ever created, lost or moved outside the enclosure.
   - The runner's JavaScript copy of the rules must match the Rust rules on 6,000 generated cases.
-  - `npm run test:svm` runs the **compiled program** in LiteSVM and plays 40 random games (~3,000 turns and ~2,700 refused attempts) in lockstep with the JS rules; every acceptance, refusal and balance must match.
+  - `npm run test:svm` runs the **compiled program** in LiteSVM and plays 40 random games (add `TOKEN=2022` to play them with a pump.fun-style Token-2022 coin) (~3,000 turns and ~2,700 refused attempts) in lockstep with the JS rules; every acceptance, refusal and balance must match.
 
 ## The agent runner
 
@@ -89,7 +89,7 @@ The runner writes:
 | The program itself can't change | Only if the upgrade authority is removed (see runbook); otherwise the deployer can upgrade it |
 | 100% of fees are spent on buybacks | The operator running `buyback.mjs`; the fee wallet is public, so anyone can check |
 | Donations after the Bell | The operator, by hand, with published receipts |
-| Who receives Bags fees | Bags' fee config (and Bags' own admin, which no one else can remove) |
+| Who receives the coin's trading fees | pump.fun's fee-sharing config: 100% to the fee wallet, set once and locked by pump.fun (shown live on the Trust page) |
 | What the agents were told and answered | Digests on-chain per turn; full log revealed after the Bell |
 
 ## What is in here
@@ -100,7 +100,8 @@ The runner writes:
 | `programs/claustrum-router` | The Anchor program wrapping the core: `initialize`, `set_agent`, `init_enclosure`, `init_holding`, `admit_first`, `renounce_admin`, `take_turn` |
 | `idl/claustrum_router.json` | Generated program interface (`scripts/gen-idl.sh`) |
 | `service/bin/keygen.mjs` | Makes every key locally |
-| `service/bin/launch.mjs` | `setup` (signed by the admin wallet) and `waive-manager` |
+| `service/bin/launch.mjs` | `setup` (signed by the admin wallet; reads the chain and only does what is missing) |
+| `service/src/chain/pumpfun.mjs` | pump.fun fee sharing: read the split, pay out the waiting fees to the fee wallet |
 | `service/bin/buyback.mjs` | The fee wallet loop: claim, buy back, distribute; holds everything after the Bell |
 | `service/bin/agents.mjs` | Runs the residents (live, or `--simulate` with no chain) |
 | `service/bin/verify.mjs` | Read-only public check from any RPC |
@@ -112,7 +113,8 @@ Tests:
 cargo test                                         # rules (repo root)
 cd programs/claustrum-router && cargo test         # layout fixtures from the real program types
 cd service && npm install && npm test              # off-chain code
-PROGRAM_SO=path/to/claustrum_router.so npm run test:svm   # the compiled program, 40 random games
+PROGRAM_SO=path/to/claustrum_router.so npm run test:svm              # the compiled program, 40 random games
+PROGRAM_SO=path/to/claustrum_router.so TOKEN=2022 npm run test:svm   # the same with a pump.fun-style Token-2022 coin
 ```
 
 ## Build
@@ -129,9 +131,9 @@ Every tool simulates first and sends nothing without `--send`. Settings come fro
    - keep it (the admin can fix bugs, and can close the program later to recover the rent), or
    - remove it for good: `solana program set-upgrade-authority <PROGRAM_ID> --final` (nobody can ever change the program; the rent is locked).
 4. **Setup, part 1.** `node bin/launch.mjs setup --program <ID> --admin <ADMIN> --admin-keypair keys/admin.json --cranker <CRANKER> --agents keys/agents.json --send`.
-5. **Launch the token** on Proxima → Bags as CLAUSTRUM / CLAUSTRUM. If Proxima allows it, share 100% of fees to the fee wallet address; otherwise claim in Proxima and send the SOL to the fee wallet.
-6. **Setup, part 2.** Re-run step 4 with `--mint <MINT>` to create the enclosure, the ten holdings and admit alcove I. Add `--renounce` to give up the admin role in the same run (recommended once everything checks out).
-7. **Waive the Bags manager**, if the launch wallet's key can be exported: `node bin/launch.mjs waive-manager --mint <MINT> --manager-keypair <launcher> --send`.
+5. **Launch the token** on pump.fun as CLAUSTRUM / CLAUSTRUM (it is a Token-2022 coin; the Router supports both token programs).
+6. **Assign the fees.** In pump.fun's fee sharing for the coin, give 100% to the fee wallet. pump.fun allows this to be set only once and then locks it. From then on anyone can trigger the payout; `buyback.mjs` does it every round.
+7. **Setup, part 2.** `claustrum setup <MINT>` on the server (or step 4 with `--mint <MINT>`). It reads the chain first and only does what is missing: the enclosure, the ten holdings, letting agents I and II in. Then `claustrum renounce <MINT>` to give up the admin role for good.
 8. **Verify and publish.** `node bin/verify.mjs --program <ID> --mint <MINT> --fee-wallet <FEE_WALLET> --rpc <RPC>`. Publish the program id, fee wallet and agent wallets on the website.
 9. **Run.**
    - `node bin/buyback.mjs --program <ID> --mint <MINT> --send --loop 10`
@@ -164,5 +166,5 @@ The operator burns 80% of the launch buy from the launch wallet and sends the ot
 ## Not yet done
 
 - **Independent review.** The program holds the agents' coins and has not been audited.
-- **Bags claim from the fee wallet** (`walletClaimIx`) is encoded from Bags' published IDL and unit-tested, but has not claimed real fees yet.
+- **The pump.fun fee payout** uses pump.fun's official SDK (`@pump-fun/pump-sdk`) and is tested against pump.fun's published account layouts, but has not paid out real fees yet.
 - **Deterministic build** for independent hash reproduction.

@@ -2,16 +2,16 @@
 // The fee wallet. All of the token's creator fees go to ONE ordinary wallet (the
 // buyback executor). This tool, on every round:
 //
-//   1. claims the wallet's Bags fees, if the wallet is a claimer of the token,
-//   2. unwraps them to SOL,
+//   1. pulls the coin's waiting pump.fun creator fees into the wallet (fee-sharing payout,
+//      or a creator-vault collect if the wallet is itself the creator),
+//   2. unwraps any wSOL to SOL,
 //   3. before the Bell: buys $CLAUSTRUM with everything above a small reserve and splits
 //      it evenly into the living agents' Router-controlled holdings (agents cannot sell);
 //      after the Bell: buys nothing. Fees simply collect in the wallet for the operator
 //      to donate to the charity the ringing agent chose.
 //   4. appends what it did to public/fees.jsonl, so anyone can follow the wallet.
 //
-// Fees can also be sent to the wallet by hand (e.g. claimed in Proxima and transferred);
-// anything above the reserve is bought back the same way.
+// SOL or $CLAUSTRUM sent to the wallet by hand is handled the same way (bought back / split).
 //
 //   RPC_URL=... EXECUTOR_KEYPAIR=keys/buyback-executor.json JUPITER_API_KEY=... \
 //   node bin/buyback.mjs --program <ROUTER_PROGRAM_ID> --mint <CLAUSTRUM_MINT> [--send] [--loop 10]
@@ -23,7 +23,8 @@ import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Connection, Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, AddressLookupTableAccount } from "@solana/web3.js";
 import { splitEvenly, distributionBatches, buybackWsolAccount, closeAccountIx, spendableLamports } from "../src/buyback.mjs";
-import { WSOL_MINT, ata, feeShareConfigAddress, decodeFeeShareConfig, walletClaimIx } from "../src/chain/bags.mjs";
+import { WSOL_MINT, ata } from "../src/chain/solana.mjs";
+import { pumpFeeInstructions } from "../src/chain/pumpfun.mjs";
 import { RouterIx } from "../src/chain/router-ix.mjs";
 import { decodeRouter } from "../src/chain/decode.mjs";
 
@@ -62,23 +63,18 @@ async function send(ixs, lookupTables = [], label) {
 async function round() {
   const routerState = decodeRouter((await connection.getAccountInfo(new PublicKey(rix.router))).data);
 
-  // 1. claim from Bags, if this wallet is one of the token's claimers
-  const cfgAcc = await connection.getAccountInfo(new PublicKey(feeShareConfigAddress(values.mint)));
-  const cfg = cfgAcc ? decodeFeeShareConfig(cfgAcc.data) : null;
-  const claimerIndex = cfg?.claimers?.indexOf(me) ?? -1;
-  if (claimerIndex >= 0) {
-    const wsolAcc = buybackWsolAccount(me);
-    const before = await connection.getTokenAccountBalance(new PublicKey(wsolAcc)).then((b) => BigInt(b.value.amount)).catch(() => 0n);
-    try {
-      const tx = await send([walletClaimIx({ payer: me, user: me, baseMint: values.mint, claimerIndex })], [], "claim Bags fees");
-      const after = await connection.getTokenAccountBalance(new PublicKey(wsolAcc)).then((b) => BigInt(b.value.amount)).catch(() => 0n);
-      if (after > before || tx) record({ kind: "claim", lamports: String(after - before), tx });
-    } catch (e) {
-      if (!/simulation failed/.test(e.message)) throw e;
-      console.log("claim: nothing to claim right now");
+  // 1. pull waiting pump.fun creator fees into this wallet
+  try {
+    const plan = await pumpFeeInstructions(connection, values.mint, me);
+    if (plan.kind === "none") console.log(`fees: ${plan.reason}`);
+    else {
+      const before = BigInt(await connection.getBalance(executor.publicKey));
+      const tx = await send(plan.ixs, [], plan.kind === "distribute" ? "pump.fun fee-sharing payout" : "collect pump.fun creator fees");
+      const after = BigInt(await connection.getBalance(executor.publicKey));
+      if (tx) record({ kind: "claim", source: `pump.fun ${plan.kind}`, lamports: String(after > before ? after - before : 0n), tx });
     }
-  } else if (cfg) {
-    console.log(`this wallet is not a Bags claimer of the token (claimers: ${cfg.claimers?.join(", ") ?? "unknown"}); only SOL sent to it by hand is used`);
+  } catch (e) {
+    console.log(`fees: could not pull creator fees this round (${e.message.split("\n")[0]})`);
   }
 
   // 2. unwrap any wSOL into SOL
@@ -111,11 +107,12 @@ async function round() {
   else console.log(`fee wallet holds ${Number(lamports) / LAMPORTS} SOL: below reserve + minimum, nothing bought`);
 
   // 4. distribute what was bought into the living agents' holdings
-  const bal = await connection.getTokenAccountBalance(new PublicKey(ata(me, values.mint))).catch(() => null);
+  const tokenProgram = (await connection.getAccountInfo(new PublicKey(values.mint))).owner.toBase58();   // SPL Token or Token-2022
+  const bal = await connection.getTokenAccountBalance(new PublicKey(ata(me, values.mint, tokenProgram))).catch(() => null);
   if (!bal || BigInt(bal.value.amount) === 0n || !living.length) return;
   const shares = splitEvenly(bal.value.amount, living.map((k) => rix.holding(k)));
   let i = 0;
-  for (const batch of distributionBatches({ executor: me, mint: values.mint, decimals: bal.value.decimals, shares })) {
+  for (const batch of distributionBatches({ executor: me, mint: values.mint, decimals: bal.value.decimals, shares, tokenProgram })) {
     const tx = await send(batch, [], `distribute batch ${++i}`);
     record({ kind: "distribute", alcoves: living.map((k) => k + 1), eachUnits: String(shares[0].amount), tx });
   }

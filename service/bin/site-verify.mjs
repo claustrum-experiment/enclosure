@@ -10,10 +10,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { Keypair } from "@solana/web3.js";
+import { Connection, Keypair } from "@solana/web3.js";
 import { readRouterFromChain, readLamports, readTokenBalance } from "../src/chain/rpc.mjs";
 import { decodeProgramAccount } from "../src/chain/decode.mjs";
 import { RouterIx } from "../src/chain/router-ix.mjs";
+import { readPumpFees } from "../src/chain/pumpfun.mjs";
 
 // SHA-256 of the program we compiled and deployed (trailing zero bytes removed, as solana-verify does).
 export const PUBLISHED_PROGRAM_HASH = "5458e2211eb163d9024791cde5f3f6f5238b1e6eb7ec8e7db4132ad382a529f0";
@@ -47,6 +48,9 @@ const deployedAt = await rpc("getBlockTime", [Number(r.lastDeploySlot)]).catch((
 const s = r.state, mint = s.claustrumMint || null, ix = new RouterIx(programId);
 const published = process.env.PUBLISHED_PROGRAM_HASH || PUBLISHED_PROGRAM_HASH;
 
+// Where the coin's trading fees go, according to pump.fun's own accounts (only once the coin exists).
+const fees = mint && feeWallet ? await readPumpFees(new Connection(rpcUrl, "confirmed"), mint, feeWallet).catch((e) => ({ found: false, error: e.message })) : null;
+
 const out = {
   checkedAt: new Date().toISOString(),
   program: {
@@ -62,6 +66,7 @@ const out = {
     agents: s.agents.map((a, k) => (a ? { alcove: k + 1, wallet: a, status: s.status[k] } : null)),
   },
   feeWallet: feeWallet ? { address: feeWallet, sol: Number(await readLamports(rpcUrl, feeWallet)) / 1e9 } : null,
+  fees: fees ? { platform: "pump.fun", ...fees } : null,
   holdingsTotal: mint ? String((await Promise.all(Array.from({ length: 10 }, (_, k) => readTokenBalance(rpcUrl, ix.holding(k))))).reduce((t, b) => t + (b ?? 0n), 0n)) : null,
 };
 writeFileSync(values.out + ".tmp", JSON.stringify(out, (_, v) => (typeof v === "bigint" ? v.toString() : v)));

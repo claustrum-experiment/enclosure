@@ -3,9 +3,14 @@
 // Needs no keys and does not use our API or database.
 //
 //   node bin/verify.mjs --program <PROGRAM_ID> [--mint <CLAUSTRUM_MINT>] [--fee-wallet <ADDRESS>] [--rpc URL] [--json]
+//
+// With --mint and --fee-wallet it also checks pump.fun's fee sharing: 100% of the coin's creator fees
+// to the fee wallet, locked.
 
 import { parseArgs } from "node:util";
-import { readRouterFromChain, readBagsFromChain, readTokenBalance, readLamports } from "../src/chain/rpc.mjs";
+import { Connection } from "@solana/web3.js";
+import { readRouterFromChain, readTokenBalance, readLamports } from "../src/chain/rpc.mjs";
+import { readPumpFees } from "../src/chain/pumpfun.mjs";
 import { RouterIx } from "../src/chain/router-ix.mjs";
 
 const { values } = parseArgs({ options: { program: { type: "string" }, mint: { type: "string" }, "fee-wallet": { type: "string" }, rpc: { type: "string", default: "https://api.mainnet-beta.solana.com" }, json: { type: "boolean", default: false } } });
@@ -22,10 +27,10 @@ const bowl = s.claustrumMint ? await readTokenBalance(values.rpc, ix.bowl) : nul
 const sealed = s.claustrumMint ? await readTokenBalance(values.rpc, ix.sealed) : null;
 const fee = values["fee-wallet"];
 const feeLamports = fee ? await readLamports(values.rpc, fee) : null;
-const bags = values.mint && fee ? await readBagsFromChain({ rpcUrl: values.rpc, baseMint: values.mint, feeWallet: fee }) : null;
+const pump = values.mint && fee ? await readPumpFees(new Connection(values.rpc, "confirmed"), values.mint, fee) : null;
 
 if (values.json) {
-  console.log(JSON.stringify({ ...r, holdings, bowl, sealed, feeWallet: fee ?? null, feeLamports, bags }, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2));
+  console.log(JSON.stringify({ ...r, holdings, bowl, sealed, feeWallet: fee ?? null, feeLamports, pump }, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2));
   process.exit(0);
 }
 
@@ -51,13 +56,16 @@ if (s.claustrumMint) {
 if (fee) {
   console.log("");
   line("Fee wallet", `${fee}  (${sol(feeLamports)} SOL)`);
-  if (bags) {
-    line("Bags fee config", bags.address);
-    if (bags.found) {
-      line("  claimers", bags.config.claimers ? bags.config.claimers.map((c, i) => `${c}=${bags.config.bps[i] / 100}%`).join(", ") : "could not decode");
-      line("  fee wallet gets 100%?", bags.soleClaimer ? "yes" : "NO");
-      line("  manager waived?", bags.managerWaived ? "yes" : `no (${bags.config.manager} can change the claimers)`);
-    } else line("  ", "not found");
+  if (pump) {
+    if (!pump.found) line("pump.fun coin", "no pump.fun bonding curve found for this mint");
+    else {
+      line("pump.fun creator", pump.creator + (pump.usingSharing ? "  (the coin's fee-sharing config)" : ""));
+      if (pump.usingSharing) {
+        line("  shareholders", (pump.shareholders ?? []).map((h) => `${h.address}=${h.bps / 100}%`).join(", ") || "could not read");
+        line("  locked for good?", pump.locked ? "yes (pump.fun allows the split to be set only once)" : "NO, it can still be changed");
+      }
+      line("  fee wallet gets 100%?", pump.allToFeeWallet ? "yes" : "NO");
+    }
   }
 }
 console.log("");

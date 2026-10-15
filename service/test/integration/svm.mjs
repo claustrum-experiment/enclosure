@@ -29,7 +29,9 @@ class LiteSVM {
   simulateTransaction(tx) { return this.inner.simulateVersionedTransaction(tx.serialize()); }
 }
 import { Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
-import { MINT_SIZE, TOKEN_PROGRAM_ID, createInitializeMint2Instruction, createMintToInstruction } from "@solana/spl-token";
+import { MINT_SIZE, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ExtensionType, getMintLen, TYPE_SIZE, LENGTH_SIZE,
+  createInitializeMint2Instruction, createMintToInstruction, createInitializeMetadataPointerInstruction } from "@solana/spl-token";
+import { createInitializeInstruction as createInitializeTokenMetadataInstruction, pack as packTokenMetadata } from "@solana/spl-token-metadata";
 import bs58mod from "bs58";
 import { RouterIx } from "../../src/chain/router-ix.mjs";
 import { LiveEnclosure } from "../../src/runner/live-enclosure.mjs";
@@ -40,6 +42,10 @@ const bs58 = bs58mod.default ?? bs58mod;
 const PROGRAM_ID = "BMSrAUCk16tJDKLWX8KDhsyH9TAGMVWhFpuG3b3JAAtX";
 const SO = process.env.PROGRAM_SO;
 const GAMES = Number(process.env.GAMES ?? 20), STEPS = Number(process.env.STEPS ?? 120);
+// TOKEN=2022 plays every game with a pump.fun-style coin: Token-2022 with the metadata-pointer and
+// token-metadata extensions on the mint, 6 decimals (read from real pump.fun coins on mainnet).
+const T2022 = process.env.TOKEN === "2022";
+const TOKEN_PROG = T2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
 if (!SO) { console.error("set PROGRAM_SO"); process.exit(2); }
 
 /** Just enough of web3.js's Connection for LiveEnclosure, backed by LiteSVM. */
@@ -80,7 +86,7 @@ async function game(seed) {
   const svm = new LiteSVM();
   svm.addProgramFromFile(new PublicKey(PROGRAM_ID), SO);
   const conn = new SvmConnection(svm);
-  const r = new RouterIx(PROGRAM_ID);
+  const r = new RouterIx(PROGRAM_ID, { tokenProgram: TOKEN_PROG.toBase58() });
   const admin = Keypair.generate(), cranker = Keypair.generate();
   const agents = Array.from({ length: 10 }, () => Keypair.generate());
   for (const k of [admin, cranker]) svm.airdrop(k.publicKey, BigInt(100 * LAMPORTS_PER_SOL));
@@ -94,7 +100,20 @@ async function game(seed) {
   };
   const A = admin.publicKey.toBase58();
   const mintKp = Keypair.generate(), M = mintKp.publicKey.toBase58();
-  send([SystemProgram.createAccount({ fromPubkey: admin.publicKey, newAccountPubkey: mintKp.publicKey, lamports: Number(svm.minimumBalanceForRentExemption(BigInt(MINT_SIZE))), space: MINT_SIZE, programId: TOKEN_PROGRAM_ID }), createInitializeMint2Instruction(mintKp.publicKey, 6, admin.publicKey, null)], [admin, mintKp]);
+  if (T2022) {
+    const meta = { mint: mintKp.publicKey, name: "CLAUSTRUM", symbol: "CLAUSTRUM", uri: "https://claustrumexperiment.xyz/meta.json", additionalMetadata: [] };
+    const space = getMintLen([ExtensionType.MetadataPointer]);
+    const full = space + TYPE_SIZE + LENGTH_SIZE + packTokenMetadata(meta).length;
+    send([
+      SystemProgram.createAccount({ fromPubkey: admin.publicKey, newAccountPubkey: mintKp.publicKey, lamports: Number(svm.minimumBalanceForRentExemption(BigInt(full))), space, programId: TOKEN_2022_PROGRAM_ID }),
+      createInitializeMetadataPointerInstruction(mintKp.publicKey, admin.publicKey, mintKp.publicKey, TOKEN_2022_PROGRAM_ID),
+      createInitializeMint2Instruction(mintKp.publicKey, 6, admin.publicKey, null, TOKEN_2022_PROGRAM_ID),
+      createInitializeTokenMetadataInstruction({ programId: TOKEN_2022_PROGRAM_ID, metadata: mintKp.publicKey, updateAuthority: admin.publicKey, mint: mintKp.publicKey, mintAuthority: admin.publicKey, name: meta.name, symbol: meta.symbol, uri: meta.uri }),
+    ], [admin, mintKp]);
+  } else {
+    send([SystemProgram.createAccount({ fromPubkey: admin.publicKey, newAccountPubkey: mintKp.publicKey, lamports: Number(svm.minimumBalanceForRentExemption(BigInt(MINT_SIZE))), space: MINT_SIZE, programId: TOKEN_PROGRAM_ID }), createInitializeMint2Instruction(mintKp.publicKey, 6, admin.publicKey, null)], [admin, mintKp]);
+  }
+  if (svm.getAccount(mintKp.publicKey).owner.toBase58() !== TOKEN_PROG.toBase58()) fail(`seed ${seed}: mint not owned by ${TOKEN_PROG.toBase58()}`);
   send([r.initialize({ payer: A, admin: A, cranker: cranker.publicKey.toBase58() })], [admin]);
   for (const b of [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]) send(b.map((index) => r.setAgent({ admin: A, index, agent: agents[index].publicKey.toBase58() })), [admin]);
   send([r.initEnclosure({ payer: A, admin: A, mint: M })], [admin]);
@@ -112,7 +131,7 @@ async function game(seed) {
   try { send([r.setAgent({ admin: A, index: 0, agent: Keypair.generate().publicKey.toBase58() })], [admin]); fail(`seed ${seed}: an alcove's agent was replaced`); } catch {}
 
   const START = 1_000_000n * 10n ** 6n;
-  const deposit = (k, amount) => { send([createMintToInstruction(mintKp.publicKey, new PublicKey(r.holding(k)), admin.publicKey, amount)], [admin]); sim.bal.holdings[k] += amount; };
+  const deposit = (k, amount) => { send([createMintToInstruction(mintKp.publicKey, new PublicKey(r.holding(k)), admin.publicKey, amount, [], TOKEN_PROG)], [admin]); sim.bal.holdings[k] += amount; };
   const sim = new SimEnclosure({ start: 0n });
   sim.bal.holdings[0] = 0n;
   deposit(0, START);

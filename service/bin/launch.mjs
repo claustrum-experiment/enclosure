@@ -2,23 +2,23 @@
 // Launch tooling. Every command simulates first; nothing is sent without --send.
 //
 //   setup          Create the Router, register the ten agent wallets and, once the token
-//                  exists (--mint), the enclosure, the ten holdings and alcove I's admission.
+//                  exists (--mint), the enclosure, the ten holdings and the first two admissions.
 //                  --renounce adds the permanent renounce_admin step at the end.
+//                  With RPC_URL set it reads the chain first and skips what is already done,
+//                  so it is safe to re-run. Works with SPL Token and Token-2022 mints.
 //                  With --admin-keypair it signs and sends as the admin wallet; without it,
 //                  writes unsigned transactions to --out.
-//   waive-manager  The token's Bags fee-share manager gives up the role, permanently.
 //
 // Examples:
 //   RPC_URL=... node bin/launch.mjs setup --program <ID> --admin <ADMIN> --admin-keypair keys/admin.json \
 //       --cranker <CRANKER> --agents keys/agents.json --mint <MINT> [--renounce] [--send]
-//   RPC_URL=... node bin/launch.mjs waive-manager --mint <MINT> --manager-keypair launcher.json [--send]
 
 import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Connection, Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { RouterIx } from "../src/chain/router-ix.mjs";
-import { managerWaiveIx } from "../src/chain/bags.mjs";
+import { decodeRouter } from "../src/chain/decode.mjs";
 import { encode } from "../src/base58.mjs";
 import { setupPlan } from "../src/launch.mjs";
 
@@ -46,9 +46,27 @@ async function simulateAndMaybeSend(ixs, signer, label) {
   console.log(`${label}: ${sig}`);
 }
 
+/** What already exists on chain, so setup can be re-run safely and only does what is missing. */
+async function readSetupState(programId, mint) {
+  const connection = new Connection(process.env.RPC_URL, "confirmed");
+  const r = new RouterIx(programId);
+  const routerAcc = await connection.getAccountInfo(new PublicKey(r.router));
+  const st = routerAcc ? decodeRouter(routerAcc.data) : null;
+  const holdings = (await connection.getMultipleAccountsInfo(Array.from({ length: 10 }, (_, k) => new PublicKey(r.holding(k))))).map(Boolean);
+  const mintAcc = mint ? await connection.getAccountInfo(new PublicKey(mint)) : null;
+  if (mint && !mintAcc) throw new Error(`mint ${mint} not found on chain`);
+  return {
+    tokenProgram: mintAcc ? mintAcc.owner.toBase58() : undefined,
+    onChain: { routerExists: !!st, agents: st ? st.agents : [], mint: st?.claustrumMint ?? null, holdings, status: st ? st.status : null, admin: st?.admin ?? null },
+  };
+}
+
 if (cmd === "setup") {
   const agents = JSON.parse(readFileSync(values.agents, "utf8"));
-  const plan = setupPlan({ programId: values.program, admin: values.admin, cranker: values.cranker, agents, mint: values.mint, renounce: values.renounce });
+  const chain = process.env.RPC_URL ? await readSetupState(values.program, values.mint) : { onChain: null };
+  if (chain.tokenProgram) console.log(`mint is owned by ${chain.tokenProgram === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" ? "Token-2022" : "SPL Token"}`);
+  const plan = setupPlan({ programId: values.program, admin: values.admin, cranker: values.cranker, agents, mint: values.mint, renounce: values.renounce, tokenProgram: chain.tokenProgram, onChain: chain.onChain });
+  if (!plan.steps.length) console.log("Nothing to do: every setup step is already on chain.");
   for (const w of plan.warnings) console.error(`WARNING: ${w}`);
   if (values["admin-keypair"]) {
     const admin = keypair(values["admin-keypair"]);
@@ -63,12 +81,7 @@ if (cmd === "setup") {
     console.log(`${i + 1}. ${s.name}: ${s.description}`);
   });
   console.log(`\nWrote ${plan.steps.length} unsigned transactions to ${values.out}/.`);
-} else if (cmd === "waive-manager") {
-  const manager = keypair(values["manager-keypair"]);
-  const m = manager.publicKey.toBase58();
-  await simulateAndMaybeSend([managerWaiveIx({ payer: m, manager: m, baseMint: values.mint })], manager, "waive Bags fee-share manager");
-  console.log("Afterwards, check with: node bin/verify.mjs --program <ID> --mint <MINT> --fee-wallet <FEE_WALLET>");
 } else {
-  console.error("commands: setup | waive-manager");
+  console.error("commands: setup");
   process.exit(2);
 }

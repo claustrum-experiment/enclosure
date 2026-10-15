@@ -30,6 +30,10 @@ export class LiveEnclosure {
     const st = decodeRouter(routerAcc.data);
     if (st.claustrumMint !== this.mint) throw new Error(`Router enclosure mint is ${st.claustrumMint}, not ${this.mint}`);
     this.decimals ??= mintAcc.data[44];
+    if (!this.tokenProgram) {   // SPL Token or Token-2022, whichever owns the mint
+      this.tokenProgram = mintAcc.owner.toBase58();
+      this.r = new RouterIx(this.programId, { tokenProgram: this.tokenProgram });
+    }
     const pots = await this.connection.getMultipleAccountsInfo([...Array.from({ length: 10 }, (_, k) => pk(this.r.holding(k))), pk(this.r.bowl), pk(this.r.sealed)], "confirmed");
     const s = {
       agents: st.agents.map((a) => a !== null),

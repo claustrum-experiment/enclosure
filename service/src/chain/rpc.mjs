@@ -3,7 +3,7 @@
 
 import { decodeRouter, decodeProgramAccount, decodeProgramData } from "./decode.mjs";
 import { routerAddress, vaultAddress } from "./pda.mjs";
-import { feeShareConfigAddress, decodeFeeShareConfig, checkBagsConfig, ata, WSOL_MINT } from "./bags.mjs";
+import { ata, WSOL_MINT } from "./solana.mjs";
 
 async function rpc(url, method, params) {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
@@ -37,15 +37,6 @@ export async function readRouterFromChain({ rpcUrl, programId }) {
     upgradeAuthority, programImmutable: upgradeAuthority === null, lastDeploySlot,
     state,
   };
-}
-
-/** Read the token's Bags fee config from chain and check it pays 100% to `feeWallet`. */
-export async function readBagsFromChain({ rpcUrl, baseMint, feeWallet }) {
-  const address = feeShareConfigAddress(baseMint);
-  const acc = await account(rpcUrl, address);
-  if (!acc) return { address, found: false, ok: false, problems: [`no Bags fee config found for mint ${baseMint}`] };
-  const cfg = decodeFeeShareConfig(acc.data);
-  return { address, found: true, config: cfg, ...checkBagsConfig(cfg, feeWallet) };
 }
 
 /** A token account's balance, or null if it does not exist. */

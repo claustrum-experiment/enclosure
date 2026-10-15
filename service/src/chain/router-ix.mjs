@@ -3,7 +3,7 @@
 
 import { fileURLToPath } from "node:url";
 import { loadIdl, buildIx } from "./idl.mjs";
-import { TOKEN_PROGRAM, ATA_PROGRAM, SYSTEM_PROGRAM } from "./bags.mjs";
+import { TOKEN_PROGRAM, ATA_PROGRAM, SYSTEM_PROGRAM } from "./solana.mjs";
 import { vaultAddress, routerAddress, findProgramAddress } from "./pda.mjs";
 
 export const ACTION_CODES = Object.freeze({ hold: 0, give: 1, burn: 2, alms_in: 3, alms_out: 4, inscribe: 5, depart: 6, spawn: 7, bell: 8 });
@@ -11,8 +11,14 @@ export const ACTION_CODES = Object.freeze({ hold: 0, give: 1, burn: 2, alms_in: 
 const BASE_IDL = loadIdl(fileURLToPath(new URL("../../../idl/claustrum_router.json", import.meta.url)));
 
 export class RouterIx {
-  constructor(programId) {
+  /**
+   * @param programId     the Router program
+   * @param o.tokenProgram the program that owns the $CLAUSTRUM mint: classic SPL Token (default) or
+   *                       Token-2022 (pump.fun coins made with create_v2). The Router accepts either.
+   */
+  constructor(programId, { tokenProgram = TOKEN_PROGRAM } = {}) {
     this.programId = programId;
+    this.tokenProgram = tokenProgram;
     this.idl = { ...BASE_IDL, address: programId };
     this.router = routerAddress(programId)[0];
     this.vault = vaultAddress(programId)[0];
@@ -20,7 +26,7 @@ export class RouterIx {
 
   #ix(name, accounts, args = {}, remaining = []) {
     return buildIx(this.idl, name, {
-      accounts: { router: this.router, vault: this.vault, token_program: TOKEN_PROGRAM, system_program: SYSTEM_PROGRAM, associated_token_program: ATA_PROGRAM, ...accounts },
+      accounts: { router: this.router, vault: this.vault, token_program: this.tokenProgram, system_program: SYSTEM_PROGRAM, associated_token_program: ATA_PROGRAM, ...accounts },
       args,
       remaining,
     });
